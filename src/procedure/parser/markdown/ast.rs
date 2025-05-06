@@ -4,7 +4,7 @@ pub trait MarkdownElement {
     fn as_html(&self) -> String;
 }
 
-pub struct Plain(MarkdownElementCollection);
+pub struct Plain(pub MarkdownElementCollection);
 
 impl MarkdownElement for Plain {
     fn as_html(&self) -> String {

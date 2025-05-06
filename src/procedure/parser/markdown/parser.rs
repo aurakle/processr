@@ -1,40 +1,37 @@
 use std::collections::HashMap;
 
-use nom::{branch::{alt, Choice}, combinator::map, error::ParseError, multi::many0, Parser};
+use nom::{branch::{alt, Choice}, combinator::map, error::ParseError, multi::many0, IResult, Map, Parser};
 use anyhow::Result;
 
 use crate::procedure::parser::Parser as ParserProcedure;
 
-use super::{ast::{MarkdownElement, MarkdownElementCollection, Plain}, extension};
+use super::{ast::{MarkdownElement, MarkdownElementCollection, Plain}, extension::{self, MarkdownExtension}};
 
-pub struct MarkdownParser<'a, A: for<'b> Parser<&'b str, Output = dyn MarkdownElement, Error = ParseError<&'a str>>> {
-    element_parser: Choice<&'a mut [A]>,
+pub struct MarkdownParser {
+    parsers: Vec<MarkdownExtension>,
 }
 
-impl MarkdownParser<'_> {
+impl MarkdownParser {
     fn make_parser(&self) -> impl Parser<&str, Output = Plain> {
         map(self.markdown_element_collection(), |elements| Plain(elements))
     }
 
     pub fn default() -> Self {
-        Self(alt(())).extend(extension::default)
+        Self(extension::default)
     }
 
-    pub fn extend(self, extension: fn(&Self) -> Parser<&str, Output = dyn MarkdownElement, Error = ParseError<&str>>) -> Self {
-        Self(alt((self.element_parser, extension)))
-    }
 
     pub fn markdown_element(&self) -> impl Parser<&str> {
-        self.element_parser
+        alt(self.parsers.as_slice())
     }
 
-    pub fn markdown_element_collection(&self) -> impl Parser<&str> {
+    pub fn markdown_element_collection<'a>(&self) -> impl Fn(&'a str) -> IResult<&'a str, MarkdownElementCollection> {
         map(many0(self.markdown_element()), MarkdownElementCollection::from)
     }
 }
 
-impl ParserProcedure for MarkdownParser<'_> {
-    fn process(&self, bytes: &Vec<u8>) -> Result<(Vec<u8>, HashMap<String, String>)> {
+impl ParserProcedure for MarkdownParser {
+    fn process(&self, bytes: &Vec<u8>, properties: &HashMap<String, String>) -> Result<(Vec<u8>, HashMap<String, String>)> {
         let mut nom_parser = self.make_parser();
         let text = String::from_utf8(bytes.clone())?;
         //TODO: parse properties and add them to the hash map

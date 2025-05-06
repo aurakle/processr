@@ -1,15 +1,16 @@
-use nom::{branch::alt, bytes::tag, combinator::{map, map_parser}, sequence::delimited, Parser};
+use nom::{branch::alt, bytes::tag, combinator::{map, map_parser}, error::ParseError, sequence::delimited, Parser};
 
 use crate::procedure::parser::markdown::{ast::{MarkdownElement, MarkdownElementCollection}, util::take_before1, MarkdownParser};
 
-pub fn all<'a>(parser: &'a MarkdownParser) -> impl Parser<&'a str> {
-    alt((
-        bold(parser),
-        code(parser),
-    ))
+use super::MarkdownExtension;
+
+pub fn all() -> Vec<MarkdownExtension> {
+    vec![
+        MarkdownExtension::from(bold)
+    ]
 }
 
-pub struct Bold(MarkdownElementCollection);
+pub struct Bold(pub MarkdownElementCollection);
 
 impl MarkdownElement for Bold {
     fn as_html(&self) -> String {
@@ -17,30 +18,30 @@ impl MarkdownElement for Bold {
     }
 }
 
-pub fn bold<'a>(parser: &'a MarkdownParser) -> impl Parser<&'a str> {
+pub fn bold<'a>(parser: &MarkdownParser) -> impl Parser<&'a str, Output = Box<dyn MarkdownElement>> {
     map(
         map_parser(
             delimited(tag("**"), take_before1(tag("**")), tag("**")),
             parser.markdown_element_collection(),
         ),
-        |elements| Bold(elements),
+        |elements| Box::new(Bold(elements)),
     )
 }
 
-pub struct Code(MarkdownElementCollection);
-
-impl MarkdownElement for Code {
-    fn as_html(&self) -> String {
-        todo!()
-    }
-}
-
-pub fn code<'a>(parser: &'a MarkdownParser) -> impl Parser<&'a str> {
-    map(
-        map_parser(
-            delimited(tag("```"), take_before1(tag("```")), tag("```")),
-            parser.markdown_element_collection(),
-        ),
-        |elements| Code(elements),
-    )
-}
+// pub struct Code(pub MarkdownElementCollection);
+//
+// impl MarkdownElement for Code {
+//     fn as_html(&self) -> String {
+//         todo!()
+//     }
+// }
+//
+// pub fn code(parser: &MarkdownParser) -> impl Parser<&str> {
+//     map(
+//         map_parser(
+//             delimited(tag("```"), take_before1(tag("```")), tag("```")),
+//             parser.markdown_element_collection(),
+//         ),
+//         |elements| Code(elements),
+//     )
+// }

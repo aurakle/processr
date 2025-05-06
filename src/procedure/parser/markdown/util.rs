@@ -5,7 +5,7 @@ use nom::{character::anychar, combinator::{peek, recognize, verify}, error::Erro
 /// Returns `Err(Err::Error((_, ErrorKind::Eof)))` if the input doesn't match the parser.
 pub fn take_before0<'a, FOutput, F>(f: F) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str>
 where
-    F: Parser<&'a str, FOutput, Error<&'a str>>,
+    F: Parser<&'a str, Output = FOutput, Error = Error<&'a str>>,
 {
     recognize(many_till(anychar, peek(f)))
 }
@@ -20,7 +20,7 @@ where
 /// (i.e. this parser cannot return any characters).
 pub fn take_before1<'a, FOutput, F>(f: F) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str>
 where
-    F: Parser<&'a str, FOutput, Error<&'a str>>,
+    F: Parser<&'a str, Output = FOutput, Error = Error<&'a str>>,
 {
     verify(take_before0(f), |x: &str| !x.is_empty())
 }
