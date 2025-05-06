@@ -19,6 +19,7 @@ fn change_directory<'a>(new_dir: &'a Path) -> Procedure<'a> {
         Ok(Item {
             path: new_path.as_path().into(),
             bytes: item.bytes.clone(),
+            properties: item.properties.clone(),
         })
     })
 }
@@ -31,6 +32,21 @@ fn change_directory<'a>(new_dir: &'a Path) -> Procedure<'a> {
 //         Ok(Item {
 //             path: new_path.as_path().into(),
 //             bytes: item.bytes.clone(),
+//             properties: item.properties.clone(),
 //         })
 //     })
 // }
+
+fn set_property<'a>(key: &'a String, value: &'a String) -> Procedure<'a> {
+    Box::new(|item| {
+        let mut properties = item.properties.clone();
+
+        properties.insert(key.into(), value.into());
+
+        Ok(Item {
+            path: item.path.clone(),
+            bytes: item.bytes.clone(),
+            properties,
+        })
+    })
+}
