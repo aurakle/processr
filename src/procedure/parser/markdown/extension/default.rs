@@ -1,12 +1,12 @@
-use nom::{branch::alt, bytes::tag, combinator::{map, map_parser}, error::ParseError, sequence::delimited, Parser};
+use nom::{bytes::tag, combinator::{map, map_parser}, sequence::delimited, Parser};
 
 use crate::procedure::parser::markdown::{ast::{MarkdownElement, MarkdownElementCollection}, util::take_before1, MarkdownParser};
 
-use super::MarkdownExtension;
+use super::{MarkdownExtension, MarkdownExtensionParser};
 
-pub fn all() -> Vec<MarkdownExtension> {
+pub fn all<'a>(parser: &'a MarkdownParser) -> Vec<MarkdownParser<'a>> {
     vec![
-        MarkdownExtension::from(bold)
+        MarkdownExtension::new(parser, bold),
     ]
 }
 
@@ -18,14 +18,16 @@ impl MarkdownElement for Bold {
     }
 }
 
-pub fn bold<'a>(parser: &MarkdownParser) -> impl Parser<&'a str, Output = Box<dyn MarkdownElement>> {
-    map(
-        map_parser(
-            delimited(tag("**"), take_before1(tag("**")), tag("**")),
-            parser.markdown_element_collection(),
-        ),
-        |elements| Box::new(Bold(elements)),
-    )
+pub fn bold<'a>(parser: &'a MarkdownParser<'a>) -> MarkdownExtensionParser {
+    Box::new(|i: &'a str| {
+        map(
+            map_parser(
+                delimited(tag("**"), take_before1(tag("**")), tag("**")),
+                parser.markdown_element_collection(),
+            ),
+            |elements| Box::new(Bold(elements)) as Box<dyn MarkdownElement>,
+        ).parse(i)
+    })
 }
 
 // pub struct Code(pub MarkdownElementCollection);
