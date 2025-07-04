@@ -6,6 +6,10 @@ use thiserror::Error;
 
 use crate::Item;
 
+pub fn single(path: &str) -> Result<Item> {
+    Item::from_file(path.to_owned())
+}
+
 pub fn regex(pat: &str) -> Result<Vec<Item>> {
     let paths = find(pat)?;
     let mut items = Vec::new();
