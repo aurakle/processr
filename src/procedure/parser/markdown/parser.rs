@@ -20,6 +20,11 @@ impl MarkdownParser {
         }
     }
 
+    pub fn extend(&mut self, extension: MarkdownExtension) -> &mut Self {
+        self.extensions.push(extension);
+        self
+    }
+
     fn make_parser<'src>(&self, old_properties: HashMap<String, Meta>) -> impl Parser<'src, &'src str, (String, HashMap<String, Meta>)> {
         properties().or_not().then(document(&self.extensions)).map(move |(new_properties, document)| {
             let mut final_properties = old_properties.clone();
