@@ -13,7 +13,7 @@ pub fn wobbly() -> MarkdownExtension {
                 inners.push(recursive_wobble(c));
             }
 
-            format!("<span aria-label=\"{}\" style=\"@keyframes spin {{ 100% {{ transform: rotate(360deg); }} }}\">{}</span>", s, inners.join(""))
+            format!("<span aria-label=\"{}\"><style scoped>@keyframes spin {{ 100% {{ transform: rotate(360deg); }} }}</style>{}</span>", s, inners.join(""))
         },
     }
 }
