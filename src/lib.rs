@@ -4,6 +4,19 @@ use anyhow::Result;
 pub mod procedure;
 pub mod selector;
 
+#[macro_export]
+macro_rules! processr {
+    ($out:literal, $($rules:expr),+) => {
+        fn main() -> anyhow::Result<()> {
+            let v = vec![$($rules),+];
+
+            v.for_each(|p| {
+                p.eval()?.write($out)?;
+            });
+        }
+    };
+}
+
 #[derive(Debug, Clone)]
 pub struct Item {
     pub path: PathBuf,
@@ -12,6 +25,11 @@ pub struct Item {
 }
 
 impl Item {
+    pub fn write(&self, root: &str) -> Result<()> {
+        let path = env::current_dir()?.join(root).join(self.path.clone());
+        Ok(fs::write(path, self.bytes.as_slice())?)
+    }
+
     pub fn from_file(path: &String) -> Result<Self> {
         let path = PathBuf::from(path);
 
