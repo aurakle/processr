@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{env, path::PathBuf};
 
 use anyhow::{bail, Result};
 use parser::Parser;
@@ -76,6 +76,7 @@ impl<P: Procedure> Procedure for SetDirectory<P> {
         };
 
         let mut new_path = self.dir.clone();
+        new_path = PathBuf::from(new_path.strip_prefix(env::current_dir()?).unwrap_or(&new_path));
         new_path.push(file_name);
 
         Ok(Item {
