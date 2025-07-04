@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf};
+use std::{env, fs, path::PathBuf};
 
 use regex::Regex;
 use anyhow::Result;
@@ -19,23 +19,14 @@ pub fn regex(pat: &str) -> Result<Vec<Item>> {
 
 // https://stackoverflow.com/questions/71918788/find-files-that-match-a-dynamic-pattern
 fn find(foo: &str) -> Result<Vec<String>, FindError> {
+    let current_dir = env::current_dir()?;
     let path = PathBuf::from(foo);
     let base = path
         .parent()
-        .ok_or(FindError::InvalidBaseFile)?
+        .unwrap_or(&current_dir)
         .to_str()
         .ok_or(FindError::OsStringNotUtf8)?;
-    let file_name = path
-        .file_stem()
-        .ok_or(FindError::InvalidFileName)?
-        .to_str()
-        .ok_or(FindError::OsStringNotUtf8)?;
-    let file_extension = path
-        .extension()
-        .ok_or(FindError::NoFileExtension)?
-        .to_str()
-        .ok_or(FindError::OsStringNotUtf8)?;
-    let pattern = format!(r"{}\.\d{{3}}\.{}", file_name, file_extension);
+    let pattern = format!(r"{}", foo);
     let expression = Regex::new(&pattern)?;
     Ok(
         fs::read_dir(&base)?
