@@ -6,7 +6,7 @@ pub mod selector;
 
 #[macro_export]
 macro_rules! processr {
-    ($out:literal, $($rules:expr),+) => {
+    ($out:literal <- $(rule $rules:expr)+) => {
         fn main() -> anyhow::Result<()> {
             let procedures = vec![$($rules),+];
 
