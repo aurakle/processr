@@ -10,9 +10,9 @@ macro_rules! processr {
         fn main() -> anyhow::Result<()> {
             let procedures = vec![$($rules),+];
 
-            procedures.into_iter().for_each(|p| {
+            for p in procedures {
                 p.eval()?.write($out)?;
-            });
+            }
 
             Ok(())
         }
