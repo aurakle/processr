@@ -3,7 +3,7 @@ use std::{env, path::PathBuf};
 use anyhow::{bail, Result};
 use parser::Parser;
 
-use crate::{Item, Meta};
+use crate::{selector::Selector, Item, Meta};
 
 pub mod parser;
 pub mod extractor;
@@ -40,12 +40,6 @@ pub trait Procedure {
             prior: self,
             parser: parser,
         }
-    }
-}
-
-impl Procedure for Item {
-    fn eval(&self) -> Result<Item> {
-        Ok(self.clone())
     }
 }
 

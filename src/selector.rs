@@ -1,24 +1,37 @@
 use std::{env, fs, path::PathBuf};
 
 use regex::Regex;
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use thiserror::Error;
 
-use crate::Item;
+use crate::{procedure::Procedure, Item};
 
-pub fn single(path: &str) -> Result<Item> {
-    Item::from_file(path.to_owned())
+pub struct Selector {
+    path: String,
 }
 
-pub fn regex(pat: &str) -> Result<Vec<Item>> {
+impl Procedure for Selector {
+    fn eval(&self) -> Result<Item> {
+        Item::from_file(self.path)
+    }
+}
+
+pub fn single(path: &str) -> Result<Selector> {
+    match fs::exists(path) {
+        Ok(b) => if b { Ok(Selector { path: path.to_owned() }) } else { anyhow!("File does not exist") },
+        e => e,
+    }
+}
+
+pub fn regex(pat: &str) -> Result<Vec<Selector>> {
     let paths = find(pat)?;
-    let mut items = Vec::new();
+    let mut selectors = Vec::new();
 
     for path in paths {
-        items.push(Item::from_file(path)?);
+        selectors.push(Selector { path });
     }
 
-    Ok(items)
+    Ok(selectors)
 }
 
 // https://stackoverflow.com/questions/71918788/find-files-that-match-a-dynamic-pattern
