@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use crate::{Item, Meta};
 
-use super::Procedure;
+use super::SingleProcedure;
 
 pub mod markdown;
 

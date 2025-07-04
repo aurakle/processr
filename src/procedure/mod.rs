@@ -8,13 +8,14 @@ use crate::{selector::Selector, Item, Meta};
 pub mod parser;
 pub mod extractor;
 
-pub trait Procedure {
+pub trait Procedure: Sized {
+    fn write(&self, out: &str) -> Result<()>;
+}
+
+pub trait SingleProcedure: Procedure + Sized {
     fn eval(&self) -> Result<Item>;
 
-    fn property(self, key: String, value: Meta) -> SetProperty<Self>
-    where
-        Self: Sized
-    {
+    fn property(self, key: String, value: Meta) -> SetProperty<Self> {
         SetProperty {
             prior: self,
             key,
@@ -22,20 +23,21 @@ pub trait Procedure {
         }
     }
 
-    fn directory<S: Into<PathBuf>>(self, dir: S) -> SetDirectory<Self>
-    where
-        Self: Sized
-    {
+    fn directory<S: Into<PathBuf>>(self, dir: S) -> SetDirectory<Self> {
         SetDirectory {
             prior: self,
             dir: dir.into(),
         }
     }
 
-    fn parse<P: Parser>(self, parser: P) -> Parse<Self, P>
-    where
-        Self: Sized
-    {
+    fn extensions<S: Into<String>>(self, extension: S) -> SetExtension<Self> {
+        SetExtension {
+            prior: self,
+            extension: extension.into(),
+        }
+    }
+
+    fn parse<P: Parser>(self, parser: P) -> Parse<Self, P> {
         Parse {
             prior: self,
             parser: parser,
@@ -43,24 +45,58 @@ pub trait Procedure {
     }
 }
 
-pub struct SetProperty<P: Procedure> {
+pub trait MultiProcedure<P: SingleProcedure>: Procedure + Sized {
+    fn chain<O, F>(&self, func: F) -> impl MultiProcedure<O>
+    where
+        O: SingleProcedure,
+        F: Fn(&P) -> O,
+    ;
+}
+
+impl<P: SingleProcedure> Procedure for P {
+    fn write(&self, out: &str) -> Result<()> {
+        self.eval()?.write(out)
+    }
+}
+
+impl<P: SingleProcedure> Procedure for Vec<P> {
+    fn write(&self, out: &str) -> Result<()> {
+        for p in self {
+            p.write(out)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl<P: SingleProcedure> MultiProcedure<P> for Vec<P> {
+    fn chain<O, F>(&self, func: F) -> impl MultiProcedure<O>
+    where
+        O: SingleProcedure,
+        F: Fn(&P) -> O,
+    {
+        self.iter().map(func).collect::<Vec<_>>()
+    }
+}
+
+pub struct SetProperty<P: SingleProcedure> {
     prior: P,
     key: String,
     value: Meta,
 }
 
-impl<P: Procedure> Procedure for SetProperty<P> {
+impl<P: SingleProcedure> SingleProcedure for SetProperty<P> {
     fn eval(&self) -> Result<Item> {
         Ok(self.prior.eval()?.set_property(self.key.clone(), self.value.clone()))
     }
 }
 
-pub struct SetDirectory<P: Procedure> {
+pub struct SetDirectory<P: SingleProcedure> {
     prior: P,
     dir: PathBuf,
 }
 
-impl<P: Procedure> Procedure for SetDirectory<P> {
+impl<P: SingleProcedure> SingleProcedure for SetDirectory<P> {
     fn eval(&self) -> Result<Item> {
         let item = self.prior.eval()?;
 
@@ -81,12 +117,23 @@ impl<P: Procedure> Procedure for SetDirectory<P> {
     }
 }
 
-pub struct Parse<P: Procedure, PARSER: Parser> {
+pub struct SetExtension<P: SingleProcedure> {
+    prior: P,
+    extension: String,
+}
+
+impl<P: SingleProcedure> SingleProcedure for SetExtension<P> {
+    fn eval(&self) -> Result<Item> {
+        todo!()
+    }
+}
+
+pub struct Parse<P: SingleProcedure, PARSER: Parser> {
     prior: P,
     parser: PARSER,
 }
 
-impl<P: Procedure, PARSER: Parser> Procedure for Parse<P, PARSER> {
+impl<P: SingleProcedure, PARSER: Parser> SingleProcedure for Parse<P, PARSER> {
     fn eval(&self) -> Result<Item> {
         let item = self.prior.eval()?;
         let (bytes, properties) = self.parser.process(&item.bytes, &item.properties)?;

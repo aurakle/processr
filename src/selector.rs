@@ -4,11 +4,11 @@ use regex::Regex;
 use anyhow::{anyhow, Context, Result};
 use thiserror::Error;
 
-use crate::{procedure::Procedure, Item};
+use crate::{procedure::SingleProcedure, Item};
 
 pub struct Selector(String);
 
-impl Procedure for Selector {
+impl SingleProcedure for Selector {
     fn eval(&self) -> Result<Item> {
         Item::from_file(&self.0)
     }
