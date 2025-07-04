@@ -8,9 +8,9 @@ pub mod selector;
 macro_rules! processr {
     ($out:literal, $($rules:expr),+) => {
         fn main() -> anyhow::Result<()> {
-            let v = vec![$($rules),+];
+            let procedures = vec![$($rules),+];
 
-            v.for_each(|p| {
+            procedures.into_iter().for_each(|p| {
                 p.eval()?.write($out)?;
             });
 
