@@ -13,6 +13,8 @@ macro_rules! processr {
             v.for_each(|p| {
                 p.eval()?.write($out)?;
             });
+
+            Ok(())
         }
     };
 }
