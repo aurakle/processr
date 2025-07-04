@@ -24,7 +24,10 @@ pub struct Item {
 
 impl Item {
     pub fn write(&self, root: &str) -> Result<()> {
-        let path = env::current_dir()?.join(root).join(self.path.clone());
+        let pwd = env::current_dir()?;
+        let path = pwd.join(root).join(self.path.clone());
+
+        fs::create_dir_all(path.parent().unwrap_or(&pwd))?;
         Ok(fs::write(path, self.bytes.as_slice())?)
     }
 
