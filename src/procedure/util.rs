@@ -2,7 +2,7 @@ use std::path::Path;
 
 use anyhow::bail;
 
-use crate::Item;
+use crate::{Item, Meta};
 
 use super::Procedure;
 
@@ -37,11 +37,11 @@ fn change_directory<'a>(new_dir: &'a Path) -> Procedure<'a> {
 //     })
 // }
 
-fn set_property<'a>(key: &'a String, value: &'a String) -> Procedure<'a> {
+fn set_property<'a>(key: &'a String, value: &'a Meta) -> Procedure<'a> {
     Box::new(|item| {
         let mut properties = item.properties.clone();
 
-        properties.insert(key.into(), value.into());
+        properties.insert(key.into(), value.clone());
 
         Ok(Item {
             path: item.path.clone(),

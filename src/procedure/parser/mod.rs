@@ -2,14 +2,14 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 
-use crate::Item;
+use crate::{Item, Meta};
 
 use super::Procedure;
 
 mod markdown;
 
 pub trait Parser {
-    fn process(&self, bytes: &Vec<u8>, properties: &HashMap<String, String>) -> Result<(Vec<u8>, HashMap<String, String>)>;
+    fn process(&self, bytes: &Vec<u8>, properties: &HashMap<String, Meta>) -> Result<(Vec<u8>, HashMap<String, Meta>)>;
 }
 
 pub fn parse<'a>(parser: &'a (dyn Parser + 'a)) -> Procedure<'a> {

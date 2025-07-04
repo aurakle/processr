@@ -1,49 +1,55 @@
-use nom::{bytes::tag, combinator::{map, map_parser}, sequence::delimited, Parser};
+use rand::Rng;
 
-use crate::procedure::parser::markdown::{ast::{MarkdownElement, MarkdownElementCollection}, util::take_before1, MarkdownParser};
+use crate::procedure::parser::markdown::MarkdownParser;
 
-use super::{MarkdownExtension, MarkdownExtensionParser};
+use super::MarkdownExtension;
 
-pub fn all<'a>(parser: &'a MarkdownParser) -> Vec<MarkdownParser<'a>> {
+pub fn all() -> Vec<MarkdownExtension> {
     vec![
-        MarkdownExtension::new(parser, bold),
+        italic(),
+        bold(),
+        code(),
+        strikethrough(),
+        // spoiler(),
     ]
 }
 
-pub struct Bold(pub MarkdownElementCollection);
-
-impl MarkdownElement for Bold {
-    fn as_html(&self) -> String {
-        todo!()
+pub fn italic() -> MarkdownExtension {
+    MarkdownExtension {
+        start: format!("*"),
+        end: format!("*"),
+        wrapper: |s| format!("<i>{}</i>", s),
     }
 }
 
-pub fn bold<'a>(parser: &'a MarkdownParser<'a>) -> MarkdownExtensionParser {
-    Box::new(|i: &'a str| {
-        map(
-            map_parser(
-                delimited(tag("**"), take_before1(tag("**")), tag("**")),
-                parser.markdown_element_collection(),
-            ),
-            |elements| Box::new(Bold(elements)) as Box<dyn MarkdownElement>,
-        ).parse(i)
-    })
+pub fn bold() -> MarkdownExtension {
+    MarkdownExtension {
+        start: format!("**"),
+        end: format!("**"),
+        wrapper: |s| format!("<b>{}</b>", s),
+    }
 }
 
-// pub struct Code(pub MarkdownElementCollection);
-//
-// impl MarkdownElement for Code {
-//     fn as_html(&self) -> String {
-//         todo!()
-//     }
-// }
-//
-// pub fn code(parser: &MarkdownParser) -> impl Parser<&str> {
-//     map(
-//         map_parser(
-//             delimited(tag("```"), take_before1(tag("```")), tag("```")),
-//             parser.markdown_element_collection(),
-//         ),
-//         |elements| Code(elements),
-//     )
-// }
+pub fn code() -> MarkdownExtension {
+    MarkdownExtension {
+        start: format!("`"),
+        end: format!("`"),
+        wrapper: |s| format!("<code>{}</code>", s),
+    }
+}
+
+pub fn strikethrough() -> MarkdownExtension {
+    MarkdownExtension {
+        start: format!("~~"),
+        end: format!("~~"),
+        wrapper: |s| format!("<s>{}</s>", s),
+    }
+}
+
+pub fn spoiler() -> MarkdownExtension {
+    MarkdownExtension {
+        start: format!("||"),
+        end: format!("||"),
+        wrapper: todo!(),
+    }
+}

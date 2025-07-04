@@ -1,6 +1,13 @@
 mod extension;
 mod parser;
-mod util;
-mod ast;
 
 pub use parser::MarkdownParser;
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use crate::procedure::parser::Parser;
+
+    use super::*;
+}
