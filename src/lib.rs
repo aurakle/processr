@@ -19,6 +19,26 @@ impl Item {
             properties: HashMap::new(),
         })
     }
+
+    pub fn set_property(&self, key: String, value: Meta) -> Self {
+        let mut properties = self.properties.clone();
+
+        properties.insert(key, value);
+
+        Self {
+            path: self.path.clone(),
+            bytes: self.bytes.clone(),
+            properties,
+        }
+    }
+
+    pub fn set_path(&self, path: PathBuf) -> Self {
+        Self {
+            path,
+            bytes: self.bytes.clone(),
+            properties: self.properties.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

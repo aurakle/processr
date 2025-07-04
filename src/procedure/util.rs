@@ -6,24 +6,6 @@ use crate::{Item, Meta};
 
 use super::Procedure;
 
-fn change_directory<'a>(new_dir: &'a Path) -> Procedure<'a> {
-    Box::new(|item| {
-        let file_name = match item.path.file_name() {
-            Some(v) => v,
-            None => bail!("Item has an invalid path"),
-        };
-
-        let mut new_path = new_dir.to_path_buf();
-        new_path.push(file_name);
-
-        Ok(Item {
-            path: new_path.as_path().into(),
-            bytes: item.bytes.clone(),
-            properties: item.properties.clone(),
-        })
-    })
-}
-
 // fn change_extension<'a>(new_extension: &'a str) -> Procedure<'a> {
 //     Box::new(|item| {
 //         //TODO: why does new_extension get outlived?
@@ -36,17 +18,3 @@ fn change_directory<'a>(new_dir: &'a Path) -> Procedure<'a> {
 //         })
 //     })
 // }
-
-fn set_property<'a>(key: &'a String, value: &'a Meta) -> Procedure<'a> {
-    Box::new(|item| {
-        let mut properties = item.properties.clone();
-
-        properties.insert(key.into(), value.clone());
-
-        Ok(Item {
-            path: item.path.clone(),
-            bytes: item.bytes.clone(),
-            properties,
-        })
-    })
-}
