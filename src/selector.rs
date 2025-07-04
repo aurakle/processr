@@ -26,6 +26,24 @@ pub fn single(path: &str) -> Result<Selector> {
 }
 
 pub fn regex(pat: &str) -> Result<Vec<Selector>> {
+    let (base, file_name) = resolve_split_path(pat)?;
+    let paths = FilesNamed::regex(file_name)
+        .within(base)
+        .find()?;
+
+    Ok(make_selectors_for_paths(paths))
+}
+
+pub fn wild(pat: &str) -> Result<Vec<Selector>> {
+    let (base, file_name) = resolve_split_path(pat)?;
+    let paths = FilesNamed::wildmatch(file_name)
+        .within(base)
+        .find()?;
+
+    Ok(make_selectors_for_paths(paths))
+}
+
+fn resolve_split_path(pat: &str) -> Result<(String, String)> {
     let current_dir = env::current_dir()?;
     let path = PathBuf::from(pat);
     let base = path
@@ -39,9 +57,11 @@ pub fn regex(pat: &str) -> Result<Vec<Selector>> {
         .ok_or(FindError::InvalidFileName)?
         .to_str()
         .ok_or(FindError::OsStringNotUtf8)?;
-    let paths = FilesNamed::regex(file_name)
-        .within(base)
-        .find()?;
+
+    Ok((base.to_owned(), file_name.to_owned()))
+}
+
+fn make_selectors_for_paths(paths: Vec<PathBuf>) -> Vec<Selector> {
     let mut selectors = Vec::new();
 
 
@@ -49,7 +69,7 @@ pub fn regex(pat: &str) -> Result<Vec<Selector>> {
         selectors.push(Selector(path));
     }
 
-    Ok(selectors)
+    selectors
 }
 
 #[derive(Error, Debug)]
