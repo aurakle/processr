@@ -6,7 +6,7 @@ use crate::{Item, Meta};
 
 use super::Procedure;
 
-mod markdown;
+pub mod markdown;
 
 pub trait Parser {
     fn process(&self, bytes: &Vec<u8>, properties: &HashMap<String, Meta>) -> Result<(Vec<u8>, HashMap<String, Meta>)>;
