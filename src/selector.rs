@@ -27,20 +27,33 @@ pub fn single(path: &str) -> Result<Selector> {
 
 pub fn regex(pat: &str) -> Result<Vec<Selector>> {
     let (base, file_name) = resolve_split_path(pat)?;
-    let paths = FilesNamed::regex(file_name)
-        .within(base)
-        .find()?;
+    let paths = recursive_search(&PathBuf::from(base), &FilesNamed::regex(file_name))?;
 
     Ok(make_selectors_for_paths(paths))
 }
 
 pub fn wild(pat: &str) -> Result<Vec<Selector>> {
     let (base, file_name) = resolve_split_path(pat)?;
-    let paths = FilesNamed::wildmatch(file_name)
-        .within(base)
-        .find()?;
+    let paths = recursive_search(&PathBuf::from(base), &FilesNamed::wildmatch(file_name))?;
 
     Ok(make_selectors_for_paths(paths))
+}
+
+fn recursive_search(dir: &Path, matcher: &FilesNamed) -> Result<Vec<PathBuf>> {
+    let mut result = matcher.within(dir).find()?;
+
+    for entry in fs::read_dir(dir)? {
+        let path = entry?.path();
+
+        if path.is_dir() {
+            let mut current = matcher.within(&path).find()?;
+            let mut inner = recursive_search(&path, matcher)?;
+            result.append(&mut current);
+            result.append(&mut inner);
+        }
+    }
+
+    Ok(result)
 }
 
 fn resolve_split_path(pat: &str) -> Result<(String, String)> {
