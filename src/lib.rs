@@ -31,9 +31,7 @@ impl Item {
         Ok(fs::write(path, self.bytes.as_slice())?)
     }
 
-    pub fn from_file(path: &String) -> Result<Self> {
-        let path = PathBuf::from(path);
-
+    pub fn from_file(path: &PathBuf) -> Result<Self> {
         Ok(Self {
             path: PathBuf::from(path.strip_prefix(env::current_dir()?).unwrap_or(&path)),
             bytes: fs::read(path)?,

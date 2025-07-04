@@ -1,12 +1,13 @@
-use std::{env, fs, path::PathBuf};
+use std::{env, fs, path::{Path, PathBuf}};
 
+use file_matcher::{FileNamed, FilesNamed};
 use regex::Regex;
 use anyhow::{anyhow, Context, Result};
 use thiserror::Error;
 
 use crate::{procedure::SingleProcedure, Item};
 
-pub struct Selector(String);
+pub struct Selector(PathBuf);
 
 impl SingleProcedure for Selector {
     fn eval(&self) -> Result<Item> {
@@ -17,7 +18,7 @@ impl SingleProcedure for Selector {
 pub fn single(path: &str) -> Result<Selector> {
     fs::exists(path).with_context(|| "Could not check whether file exists").and_then(|b| {
         if b {
-            Ok(Selector(path.to_owned()))
+            Ok(Selector(PathBuf::from(path)))
         } else {
             Err(anyhow!("File does not exist"))
         }
@@ -25,8 +26,24 @@ pub fn single(path: &str) -> Result<Selector> {
 }
 
 pub fn regex(pat: &str) -> Result<Vec<Selector>> {
-    let paths = find(pat)?;
+    let current_dir = env::current_dir()?;
+    let path = PathBuf::from(pat);
+    let base = path
+        .parent()
+        .unwrap_or(&current_dir)
+        .to_str()
+        .ok_or(FindError::OsStringNotUtf8)?;
+    let file_name = path
+        .file_name()
+        .map(|os_str| Path::new(os_str))
+        .ok_or(FindError::InvalidFileName)?
+        .to_str()
+        .ok_or(FindError::OsStringNotUtf8)?;
+    let paths = FilesNamed::regex(file_name)
+        .within(base)
+        .find()?;
     let mut selectors = Vec::new();
+
 
     for path in paths {
         selectors.push(Selector(path));
@@ -35,41 +52,10 @@ pub fn regex(pat: &str) -> Result<Vec<Selector>> {
     Ok(selectors)
 }
 
-// https://stackoverflow.com/questions/71918788/find-files-that-match-a-dynamic-pattern
-fn find(foo: &str) -> Result<Vec<String>, FindError> {
-    let current_dir = env::current_dir()?;
-    let path = PathBuf::from(foo);
-    let base = path
-        .parent()
-        .unwrap_or(&current_dir)
-        .to_str()
-        .ok_or(FindError::OsStringNotUtf8)?;
-    let pattern = format!(r"{}", foo);
-    let expression = Regex::new(&pattern)?;
-    Ok(
-        fs::read_dir(&base)?
-            .map(|entry| Ok(
-                entry?
-                .path()
-                .file_name()
-                .ok_or(FindError::InvalidFileName)?
-                .to_str()
-                .ok_or(FindError::OsStringNotUtf8)?
-                .to_string()
-            ))
-            .collect::<Result<Vec<_>, FindError>>()?
-            .into_iter()
-            .filter(|file_name| expression.is_match(&file_name))
-            .collect()
-    )
-}
-
 #[derive(Error, Debug)]
 enum FindError {
     #[error(transparent)]
     RegexError(#[from] regex::Error),
-    #[error("File name has no extension")]
-    NoFileExtension,
     #[error("Not a valid file name")]
     InvalidFileName,
     #[error("No valid base file")]
