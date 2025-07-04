@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, path::{Path, PathBuf}};
+use std::{collections::HashMap, env, fs, path::{Path, PathBuf}};
 use anyhow::Result;
 
 pub mod procedure;
@@ -13,9 +13,11 @@ pub struct Item {
 
 impl Item {
     pub fn from_file(path: String) -> Result<Self> {
+        let path = PathBuf::from(path.clone());
+
         Ok(Self {
-            path: PathBuf::from(path.clone()),
-            bytes: fs::read(Path::new(path.as_str()))?,
+            path: PathBuf::from(path.strip_prefix(env::current_dir()?).unwrap_or(&path)),
+            bytes: fs::read(path)?,
             properties: HashMap::new(),
         })
     }
