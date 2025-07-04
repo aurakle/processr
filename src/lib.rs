@@ -12,8 +12,8 @@ pub struct Item {
 }
 
 impl Item {
-    pub fn from_file(path: String) -> Result<Self> {
-        let path = PathBuf::from(path.clone());
+    pub fn from_file(path: &String) -> Result<Self> {
+        let path = PathBuf::from(path);
 
         Ok(Self {
             path: PathBuf::from(path.strip_prefix(env::current_dir()?).unwrap_or(&path)),

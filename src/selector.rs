@@ -1,26 +1,27 @@
 use std::{env, fs, path::PathBuf};
 
 use regex::Regex;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use thiserror::Error;
 
 use crate::{procedure::Procedure, Item};
 
-pub struct Selector {
-    path: String,
-}
+pub struct Selector(String);
 
 impl Procedure for Selector {
     fn eval(&self) -> Result<Item> {
-        Item::from_file(self.path)
+        Item::from_file(&self.0)
     }
 }
 
 pub fn single(path: &str) -> Result<Selector> {
-    match fs::exists(path) {
-        Ok(b) => if b { Ok(Selector { path: path.to_owned() }) } else { anyhow!("File does not exist") },
-        e => e,
-    }
+    fs::exists(path).with_context(|| "Could not check whether file exists").and_then(|b| {
+        if b {
+            Ok(Selector(path.to_owned()))
+        } else {
+            Err(anyhow!("File does not exist"))
+        }
+    })
 }
 
 pub fn regex(pat: &str) -> Result<Vec<Selector>> {
@@ -28,7 +29,7 @@ pub fn regex(pat: &str) -> Result<Vec<Selector>> {
     let mut selectors = Vec::new();
 
     for path in paths {
-        selectors.push(Selector { path });
+        selectors.push(Selector(path));
     }
 
     Ok(selectors)
