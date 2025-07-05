@@ -111,17 +111,17 @@ fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src
             just("\n\n").to(format!("<br/>")),
             just('\n').to(format!("")),
             any()
-                .and_is(just('`').not())
-                .repeated()
-                .to_slice()
-                .padded_by(just('`'))
-                .map(|inner| format!("<code>{}</code>", html_escape::encode_safe(inner))),
-            any()
                 .and_is(just("```").not())
                 .repeated()
                 .to_slice()
                 .padded_by(just("```"))
                 .map(|inner| format!("<pre><code>{}</code></pre>", html_escape::encode_safe(inner))),
+            any()
+                .and_is(just('`').not())
+                .repeated()
+                .to_slice()
+                .padded_by(just('`'))
+                .map(|inner| format!("<code>{}</code>", html_escape::encode_safe(inner))),
             just('!')
                 .ignore_then(
                     group((
