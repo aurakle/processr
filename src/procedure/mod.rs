@@ -1,12 +1,11 @@
 use std::{env, path::PathBuf};
 
 use anyhow::{bail, Result};
-use parser::Parser;
+use parser::{template::TemplateParser, Parser};
 
 use crate::{selector::Selector, Item, Meta};
 
 pub mod parser;
-pub mod extractor;
 
 pub trait Procedure: Sized {
     fn write(&self, out: &str) -> Result<()>;
@@ -42,6 +41,10 @@ pub trait SingleProcedure: Procedure + Sized + Clone {
             prior: self,
             parser: parser,
         }
+    }
+
+    fn apply<S: Into<PathBuf>>(self, template_path: S) -> Result<Parse<Self, TemplateParser>> {
+        Ok(self.parse(TemplateParser::new(template_path.into())?))
     }
 }
 

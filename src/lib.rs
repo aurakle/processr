@@ -1,8 +1,11 @@
-use std::{collections::HashMap, env, fs, path::{Path, PathBuf}};
+use std::{collections::HashMap, env, fmt::Display, fs, path::{Path, PathBuf}};
 use anyhow::Result;
+use procedure::SingleProcedure;
 
+pub mod prelude;
 pub mod procedure;
 pub mod selector;
+pub mod extractor;
 
 #[macro_export]
 macro_rules! processr {
@@ -60,8 +63,49 @@ impl Item {
     }
 }
 
+impl SingleProcedure for Item {
+    fn eval(&self) -> Result<Item> {
+        Ok(self.clone())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
-pub enum Meta {
-    List(Vec<Meta>),
-    Text(String),
+pub struct Meta(pub Vec<String>);
+
+impl Meta {
+    pub fn as_string(&self) -> String {
+        self.0.join(", ")
+    }
+}
+
+impl From<String> for Meta {
+    fn from(value: String) -> Self {
+        Self(vec![value])
+    }
+}
+
+impl From<&str> for Meta {
+    fn from(value: &str) -> Self {
+        Self(vec![value.to_owned()])
+    }
+}
+
+impl<T: Display> From<Vec<T>> for Meta {
+    fn from(value: Vec<T>) -> Self {
+        let mut result = Vec::new();
+
+        for item in value {
+            result.push(format!("{}", item));
+        }
+
+        Self(result)
+    }
+}
+
+pub fn create(path: &str) -> Item {
+    Item {
+        path: PathBuf::from(path),
+        bytes: Vec::new(),
+        properties: HashMap::new(),
+    }
 }

@@ -4,8 +4,8 @@ use super::MarkdownExtension;
 
 pub fn wobbly() -> MarkdownExtension {
     MarkdownExtension {
-        start: format!("~>"),
-        end: format!("<~"),
+        start: format!("~["),
+        end: format!("]~"),
         wrapper: |s| {
             let mut inners = Vec::new();
 
