@@ -1,6 +1,6 @@
 use rand::Rng;
 
-use crate::procedure::parser::markdown::MarkdownParser;
+use crate::parser::markdown::MarkdownParser;
 
 use super::MarkdownExtension;
 

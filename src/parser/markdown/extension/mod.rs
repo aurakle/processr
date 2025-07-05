@@ -1,7 +1,6 @@
 mod default;
 pub mod extra;
 
-use chumsky::Boxed;
 pub use default::all as default;
 
 #[derive(Debug, Clone)]

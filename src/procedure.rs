@@ -1,11 +1,10 @@
+use std::fs;
 use std::{env, path::PathBuf};
 
 use anyhow::{bail, Result};
-use parser::{template::TemplateParser, Parser};
+use crate::parser::{template::TemplateParser, Parser};
 
 use crate::{selector::Selector, Item, Meta};
-
-pub mod parser;
 
 pub trait Procedure: Sized {
     fn write(&self, out: &str) -> Result<()>;
@@ -43,8 +42,11 @@ pub trait SingleProcedure: Procedure + Sized + Clone {
         }
     }
 
-    fn apply<S: Into<PathBuf>>(self, template_path: S) -> Parse<Self, TemplateParser> {
-        self.parse(TemplateParser::new(template_path.into()))
+    fn apply<S: Into<PathBuf>>(self, template: S) -> ApplyTemplate<Self> {
+        ApplyTemplate {
+            prior: self,
+            template: template.into(),
+        }
     }
 }
 
@@ -54,6 +56,8 @@ pub trait MultiProcedure<P: SingleProcedure>: Procedure + Sized {
         O: SingleProcedure,
         F: Fn(P) -> O,
     ;
+
+    fn into_meta(&self) -> Result<Meta>;
 }
 
 impl<P: SingleProcedure> Procedure for P {
@@ -85,6 +89,16 @@ impl<P: SingleProcedure> MultiProcedure<P> for Vec<P> {
         }
 
         result
+    }
+
+    fn into_meta(&self) -> Result<Meta> {
+        let mut result = Vec::new();
+
+        for p in self {
+           result.push(p.eval()?.into_meta()?);
+        }
+
+        Ok(Meta::from(result))
     }
 }
 
@@ -157,6 +171,27 @@ impl<P: SingleProcedure, PARSER: Parser> SingleProcedure for Parse<P, PARSER> {
     fn eval(&self) -> Result<Item> {
         let item = self.prior.eval()?;
         let (bytes, properties) = self.parser.process(&item.bytes, &item.properties)?;
+
+        Ok(Item {
+            path: item.path.clone(),
+            bytes,
+            properties,
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct ApplyTemplate<P: SingleProcedure> {
+    prior: P,
+    template: PathBuf,
+}
+
+impl<P: SingleProcedure> SingleProcedure for ApplyTemplate<P> {
+    fn eval(&self) -> Result<Item> {
+        let item = self.prior.eval()?;
+        let properties = item.properties_with_url_and_body()?;
+        let template = fs::read(self.template.clone())?;
+        let (bytes, properties) = TemplateParser::default().process(&template, &properties)?;
 
         Ok(Item {
             path: item.path.clone(),

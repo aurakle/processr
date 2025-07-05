@@ -1,8 +1,9 @@
 use std::{collections::HashMap, env, fmt::Display, fs, path::{Path, PathBuf}};
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use procedure::SingleProcedure;
 
 pub mod prelude;
+pub mod parser;
 pub mod procedure;
 pub mod selector;
 pub mod extractor;
@@ -61,6 +62,19 @@ impl Item {
             properties: self.properties.clone(),
         }
     }
+
+    pub fn properties_with_url_and_body(&self) -> Result<HashMap<String, Meta>> {
+        let mut props = self.properties.clone();
+
+        props.insert(format!("url"), Meta::from(self.path.as_os_str().to_str().ok_or(anyhow!("File path {} is not valid UTF-8", self.path.display()))?));
+        props.insert(format!("body"), Meta::from(String::from_utf8(self.bytes.clone())?));
+
+        Ok(props)
+    }
+
+    pub fn into_meta(&self) -> Result<Meta> {
+        self.properties_with_url_and_body().map(|props| Meta::from(props))
+    }
 }
 
 impl SingleProcedure for Item {
@@ -70,35 +84,33 @@ impl SingleProcedure for Item {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Meta(pub Vec<String>);
+pub enum Meta {
+    Map(HashMap<String, Meta>),
+    List(Vec<Meta>),
+    Text(String),
+}
 
-impl Meta {
-    pub fn as_string(&self) -> String {
-        self.0.join(", ")
+impl From<HashMap<String, Meta>> for Meta {
+    fn from(value: HashMap<String, Meta>) -> Self {
+        Self::Map(value)
+    }
+}
+
+impl From<Vec<Meta>> for Meta {
+    fn from(value: Vec<Meta>) -> Self {
+        Self::List(value)
     }
 }
 
 impl From<String> for Meta {
     fn from(value: String) -> Self {
-        Self(vec![value])
+        Self::Text(value)
     }
 }
 
 impl From<&str> for Meta {
     fn from(value: &str) -> Self {
-        Self(vec![value.to_owned()])
-    }
-}
-
-impl<T: Display> From<Vec<T>> for Meta {
-    fn from(value: Vec<T>) -> Self {
-        let mut result = Vec::new();
-
-        for item in value {
-            result.push(format!("{}", item));
-        }
-
-        Self(result)
+        Self::Text(value.to_owned())
     }
 }
 

@@ -7,11 +7,11 @@ use crate::Meta;
 use super::Parser as ParserProcedure;
 
 #[derive(Debug, Clone)]
-pub struct TemplateParser(PathBuf);
+pub struct TemplateParser();
 
 impl TemplateParser {
-    pub fn new(path: PathBuf) -> TemplateParser {
-        Self(path)
+    pub fn default() -> TemplateParser {
+        Self()
     }
 
     fn make_parser<'src>(&self, properties: HashMap<String, Meta>) -> impl Parser<'src, &'src str, String> {
@@ -21,12 +21,9 @@ impl TemplateParser {
 
 impl ParserProcedure for TemplateParser {
     fn process(&self, bytes: &Vec<u8>, properties: &HashMap<String, Meta>) -> Result<(Vec<u8>, HashMap<String, Meta>)> {
-        let mut props = properties.clone();
-        props.insert(format!("body"), Meta::from(String::from_utf8(bytes.clone())?));
-
-        let template = fs::read_to_string(&self.0)?;
-        let parser = self.make_parser(props);
-        let text = parser.parse(template.as_str()).into_result().map_err(|_e| anyhow!("Failed to parse template"))?;
+        let text = String::from_utf8(bytes.clone())?;
+        let parser = self.make_parser(properties.clone());
+        let text = parser.parse(text.as_str()).into_result().map_err(|_e| anyhow!("Failed to parse markdown"))?;
 
         Ok((text.as_bytes().to_vec(), properties.clone()))
     }

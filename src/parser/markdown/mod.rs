@@ -59,11 +59,12 @@ fn properties<'src>() -> impl Parser<'src, &'src str, HashMap<String, Meta>> {
 fn yaml<'src>() -> impl Parser<'src, &'src str, HashMap<String, Meta>> {
     let text = none_of(",:\n")
         .repeated()
-        .collect();
+        .collect::<String>()
+        .map(Meta::from);
     let list = text
         .separated_by(just(',').padded_by(whitespace()))
-        .collect()
-        .map(|strings| Meta(strings));
+        .collect::<Vec<_>>()
+        .map(Meta::from);
     let entry = ident()
         .map(str::to_owned)
         .then_ignore(just(':').padded_by(whitespace()))
@@ -152,14 +153,14 @@ mod tests {
 
         use chumsky::Parser;
 
-        use crate::{procedure::parser::markdown::properties, Meta};
+        use crate::{parser::markdown::properties, Meta};
 
         #[test]
         fn text() {
             let res = properties().parse("---\nitem1: prrr\n---").into_result().unwrap();
             let mut expected = HashMap::new();
 
-            expected.insert(format!("item1"), Meta::from(format!("prrr")));
+            expected.insert(format!("item1"), Meta::from(vec!(Meta::from(format!("prrr")))));
 
             assert_eq!(expected, res);
         }
@@ -169,7 +170,7 @@ mod tests {
             let res = properties().parse("---\nitem2: meow, mrrow\n---").into_result().unwrap();
             let mut expected = HashMap::new();
 
-            expected.insert(format!("item2"), Meta(vec![format!("meow"), format!("mrrow")]));
+            expected.insert(format!("item2"), Meta::from(vec![Meta::from(format!("meow")), Meta::from(format!("mrrow"))]));
 
             assert_eq!(expected, res);
         }
@@ -179,8 +180,8 @@ mod tests {
             let res = properties().parse("---\nitem1: prrr\nitem2: meow, mrrow\n---").into_result().unwrap();
             let mut expected = HashMap::new();
 
-            expected.insert(format!("item1"), Meta::from(format!("prrr")));
-            expected.insert(format!("item2"), Meta(vec![format!("meow"), format!("mrrow")]));
+            expected.insert(format!("item1"), Meta::from(vec!(Meta::from(format!("prrr")))));
+            expected.insert(format!("item2"), Meta::from(vec![Meta::from(format!("meow")), Meta::from(format!("mrrow"))]));
 
             assert_eq!(expected, res);
         }
@@ -189,7 +190,7 @@ mod tests {
     mod element {
         use chumsky::Parser;
 
-        use crate::procedure::parser::markdown::{element, extension};
+        use crate::parser::markdown::{element, extension};
 
         #[test]
         fn plain() {
@@ -267,7 +268,7 @@ mod tests {
     mod document {
         use chumsky::Parser;
 
-        use crate::procedure::parser::markdown::{document, extension};
+        use crate::parser::markdown::{document, extension};
 
         #[test]
         fn plain() {
