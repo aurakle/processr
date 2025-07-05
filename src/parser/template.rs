@@ -1,6 +1,7 @@
+use std::{collections::HashMap, env, fs};
+
 use anyhow::{anyhow, Result};
 use chumsky::{prelude::*, text::{ident, keyword, newline}};
-use std::{collections::HashMap, env, fs, path::PathBuf};
 
 use crate::Meta;
 
@@ -13,26 +14,19 @@ impl TemplateParser {
     pub fn default() -> TemplateParser {
         Self()
     }
-
-    fn make_parser<'src>(&self, properties: HashMap<String, Meta>) -> impl Parser<'src, &'src str, String> {
-        element(properties)
-            .repeated()
-            .collect::<Vec<_>>()
-            .map(|elements| elements.concat())
-    }
 }
 
 impl ParserProcedure for TemplateParser {
     fn process(&self, bytes: &Vec<u8>, properties: &HashMap<String, Meta>) -> Result<(Vec<u8>, HashMap<String, Meta>)> {
         let text = String::from_utf8(bytes.clone())?;
-        let parser = self.make_parser(properties.clone());
+        let parser = make_parser(properties.clone());
         let text = parser.parse(text.as_str()).into_result().map_err(|_e| anyhow!("Failed to parse markdown"))?;
 
         Ok((text.as_bytes().to_vec(), properties.clone()))
     }
 }
 
-fn element<'src>(properties: HashMap<String, Meta>) -> impl Parser<'src, &'src str, String> + Clone {
+fn make_parser<'src>(properties: HashMap<String, Meta>) -> impl Parser<'src, &'src str, String> + Clone {
     recursive(move |this| {
         let this1 = this.clone();
         let this2 = this.clone();
@@ -42,95 +36,206 @@ fn element<'src>(properties: HashMap<String, Meta>) -> impl Parser<'src, &'src s
         let props1 = properties.clone();
         let props2 = properties.clone();
         let props3 = properties.clone();
+        let props4 = properties.clone();
+
+        let partial = keyword("partial")
+            .ignore_then(none_of("\"")
+                .repeated()
+                .collect::<String>()
+                .delimited_by(just("(\""), just("\")")))
+            .padded_by(just('$'))
+            .try_map(|path, _span| {
+                fs::read_to_string(env::current_dir()
+                    .map_err(|_e| EmptyErr::default())?
+                    .join(path))
+                    .map_err(|_e| EmptyErr::default())
+            })
+            .to_slice()
+            .try_map(move |include, _span| {
+                make_parser(props1.clone())
+                    .parse(include)
+                    .into_result()
+                    .map_err(|_e| EmptyErr::default())
+            });
+
+        let foreach = keyword("for")
+            .ignore_then(ident()
+                .delimited_by(just('('), just(')')))
+            .padded_by(just('$'))
+            .then(any()
+                .and_is(just("$endfor$").not())
+                .repeated()
+                .collect::<String>())
+            .then_ignore(just("$endfor$"))
+            .try_map(move |(key, inner), _span| {
+                let mut result = Vec::new();
+                let list = props2.get(key).and_then(Meta::as_list).unwrap_or_else(Vec::new);
+
+                for item in list {
+                    let mut map = match item.clone() {
+                        Meta::Map(map) => map,
+                        _ => HashMap::new(),
+                    };
+
+                    map.insert(format!("i"), item);
+                    result.push(make_parser(map)
+                        .parse(inner.as_ref())
+                        .into_result()
+                        .map_err(|_e| EmptyErr::default())?);
+                }
+
+                Ok(result.concat())
+            });
+
+        let if_else = keyword("if")
+            .ignore_then(ident().delimited_by(just('('), just(')')))
+            .padded_by(just('$'))
+            .then(this3)
+            .then(just("$else$")
+                .ignore_then(this4)
+                .or_not())
+            .then_ignore(just("$endif$"))
+            .map(move |((key, then), otherwise)| {
+                let s = props3.get(key).and_then(Meta::as_string).unwrap_or_else(String::new);
+
+                if s.len() != 0 {
+                    then
+                } else {
+                    otherwise.unwrap_or_else(String::new)
+                }
+            });
+
+        let access = ident()
+            .padded_by(just('$'))
+            .map(move |key| props4.get(key).and_then(Meta::as_string).unwrap_or_else(String::new));
 
         let element = choice((
-            keyword("partial")
-                .ignore_then(none_of("\"")
-                    .repeated()
-                    .collect::<String>()
-                    .delimited_by(just("(\""), just("\")")))
-                .padded_by(just('$'))
-                .try_map(|path, _span| {
-                    fs::read_to_string(env::current_dir()
-                        .map_err(|_e| EmptyErr::default())?
-                        .join(path))
-                        .map_err(|_e| EmptyErr::default())
-                })
-                .to_slice()
-                .try_map(move |include, _span| {
-                    this1.clone()
-                        .repeated()
-                        .collect::<Vec<_>>()
-                        .map(|elements| elements.concat())
-                        .parse(include)
-                        .into_result()
-                        .map_err(|_e| EmptyErr::default())
-                }),
-            keyword("for")
-                .ignore_then(ident()
-                    .delimited_by(just('('), just(')')))
-                .padded_by(just('$'))
-                .then(any()
-                    .and_is(just("$endfor$").not())
-                    .repeated()
-                    .collect::<String>())
-                .then_ignore(just("$endfor$"))
-                .try_map(move |(key, inner), _span| {
-                    let mut result = Vec::new();
-                    let list = props1.get(key).and_then(Meta::as_list).unwrap_or_else(Vec::new);
-
-                    for item in list {
-                        let mut map = match item.clone() {
-                            Meta::Map(map) => map,
-                            _ => HashMap::new(),
-                        };
-
-                        map.insert(format!("i"), item);
-                        result.push(element(map)
-                            .repeated()
-                            .collect::<Vec<_>>()
-                            .map(|elements| elements.concat())
-                            .parse(inner.as_ref())
-                            .into_result()
-                            .map_err(|_e| EmptyErr::default())?);
-                    }
-
-                    Ok(result.concat())
-                }),
-            keyword("if")
-                .ignore_then(ident()
-                    .delimited_by(just('('), just(')')))
-                .padded_by(just('$'))
-                .then(this3
-                    .and_is(just("$endif$")
-                        .or(just("$elseif$"))
-                        .not())
-                    .repeated()
-                    .collect::<Vec<_>>()
-                    .map(|elements| elements.concat()))
-                .then(just("$elseif$")
-                    .ignore_then(this4
-                        .and_is(just("$endif$")
-                            .not())
-                        .repeated()
-                        .collect::<Vec<_>>()
-                        .map(|elements| elements.concat()))
-                    .or_not())
-                .then_ignore(just("$endif$"))
-                .map(move |((key, then), otherwise)| {
-                    let s = props2.get(key).and_then(Meta::as_string).unwrap_or_else(String::new);
-
-                    if s.len() != 0 {
-                        then
-                    } else {
-                        otherwise.unwrap_or_else(String::new)
-                    }
-                }),
-            ident()
-                .padded_by(just('$'))
-                .map(move |key| props3.get(key).and_then(Meta::as_string).unwrap_or_else(String::new)),
+            partial,
+            foreach,
+            if_else,
+            access,
         ));
 
-        element.clone().or(any().and_is(element.not()).repeated().at_least(1).collect())
+        element.clone()
+            .or(any().and_is(element.not()).repeated().at_least(1).collect::<String>())
+            .and_is(just("$else$").not())
+            .and_is(just("$endif$").not())
+            .repeated()
+            .collect::<Vec<String>>()
+            .map(|elements| elements.concat())
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::HashMap, fs};
+
+    use chumsky::Parser;
+
+    use crate::Meta;
+
+    use super::make_parser;
+
+    #[test]
+    fn plain() {
+        let props = HashMap::new();
+        let parser = make_parser(props);
+        let res = parser.parse("meowmeow").into_result().unwrap();
+        let expected = format!("meowmeow");
+
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn text_access() {
+        let mut props = HashMap::new();
+        props.insert(format!("mrrp"), Meta::from("prrr"));
+        let parser = make_parser(props);
+        let res = parser.parse("$mrrp$").into_result().unwrap();
+        let expected = format!("prrr");
+
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn list_access() {
+        let mut props = HashMap::new();
+        props.insert(format!("mrrp"), Meta::from(vec![Meta::from("prrr")]));
+        let parser = make_parser(props);
+        let res = parser.parse("$mrrp$").into_result().unwrap();
+        let expected = format!("prrr");
+
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn map_access() {
+        let mut props = HashMap::new();
+        let mut map = HashMap::new();
+        map.insert(format!("bwa"), Meta::from("pain"));
+        props.insert(format!("mrrp"), Meta::from(map));
+        let parser = make_parser(props);
+        let res = parser.parse("$mrrp$").into_result().unwrap();
+        let expected = format!("");
+
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn partial() {
+        todo!(); //TODO: this causes OOM death probably
+        let mut props = HashMap::new();
+        let parser = make_parser(props);
+        let res = parser.parse("$partial(\"test/templates/partial.txt\")$").into_result().unwrap();
+        let expected = fs::read_to_string("test/templates/partial.txt").unwrap();
+
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn for_each() {
+        todo!()
+    }
+
+    #[test]
+    fn if_else_true() {
+        let mut props = HashMap::new();
+        props.insert(format!("b"), Meta::from("yay"));
+        let parser = make_parser(props);
+        let res = parser.parse("$if(b)$meow$else$prrr$endif$").into_result().unwrap();
+        let expected = format!("meow");
+
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn if_else_false() {
+        let mut props = HashMap::new();
+        let parser = make_parser(props);
+        let res = parser.parse("$if(b)$meow$else$prrr$endif$").into_result().unwrap();
+        let expected = format!("prrr");
+
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn if_true() {
+        let mut props = HashMap::new();
+        props.insert(format!("b"), Meta::from("yay"));
+        let parser = make_parser(props);
+        let res = parser.parse("$if(b)$meow$endif$").into_result().unwrap();
+        let expected = format!("meow");
+
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn if_false() {
+        let mut props = HashMap::new();
+        let parser = make_parser(props);
+        let res = parser.parse("$if(b)$meow$endif$").into_result().unwrap();
+        let expected = format!("");
+
+        assert_eq!(expected, res);
+    }
 }
