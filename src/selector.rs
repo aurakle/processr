@@ -29,6 +29,7 @@ pub fn exact(path: &str) -> Result<Selector> {
 pub fn regex(pat: &str) -> Result<Vec<Selector>> {
     let (base, file_name) = resolve_split_path(pat)?;
     let r = Regex::new(file_name.as_str())?;
+    println!("Searching dir {} with regex", base.clone());
     let paths = recursive_search(&PathBuf::from(base), &|p| r.is_match(p))?;
 
     Ok(make_selectors_for_paths(paths))
@@ -37,6 +38,7 @@ pub fn regex(pat: &str) -> Result<Vec<Selector>> {
 pub fn wild(pat: &str) -> Result<Vec<Selector>> {
     let (base, file_name) = resolve_split_path(pat)?;
     let r = WildMatch::new(file_name.as_str());
+    println!("Searching dir {} with wildmatch", base.clone());
     let paths = recursive_search(&PathBuf::from(base), &|p| r.is_match(p))?;
 
     Ok(make_selectors_for_paths(paths))
@@ -47,8 +49,6 @@ where
     F: Fn(&str) -> bool,
 {
     let mut result = Vec::new();
-
-    println!("Searching {}", dir.display());
 
     for entry in fs::read_dir(dir)? {
         let path = entry?.path();
