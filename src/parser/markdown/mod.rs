@@ -110,22 +110,30 @@ fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src
                     .map(|s| format!("<p>{}</p>", s)),
             just("\n\n").to(format!("<br/>")),
             just('\n').to(format!("")),
+            any()
+                .and_is(just('`').not())
+                .repeated()
+                .to_slice()
+                .delimited_by(just('`'), just('`'))
+                .map(|inner| format!("<code>{}</code>", inner)),
             group((
                 any()
                     .and_is(just(']').not())
                     .repeated()
                     .to_slice()
                     .try_map(closure.clone())
+                    .or_not()
                     .delimited_by(just('['), just(']')),
                 any()
                     .and_is(just(')').not())
                     .repeated()
                     .to_slice()
                     .try_map(closure.clone())
+                    .or_not()
                     .delimited_by(just('('), just(')')),
             ))
                 .map(|(text, link)| {
-                    format!("<a href=\"{}\">{}</a>", link, text)
+                    format!("<a href=\"{}\">{}</a>", link.unwrap_or_else(String::new), text.unwrap_or_else(String::new))
                 })
             //TODO: add image and link support
         )).boxed();
