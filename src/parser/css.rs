@@ -23,7 +23,9 @@ impl ParserProcedure for CssCompressor {
             last_len = text.len();
             text = text
                 .replace("{ ", "{")
+                .replace(" {", "{")
                 .replace("} ", "}")
+                .replace(" }", "}")
                 .replace(": ", ":")
                 .replace("; ", ";")
                 .replace("	", " ")
