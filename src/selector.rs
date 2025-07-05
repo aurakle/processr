@@ -50,6 +50,7 @@ where
 
     for entry in fs::read_dir(dir)? {
         let path = entry?.path();
+        println!("{}", path);
 
         if path.is_dir() {
             let mut inner = recursive_search(&path, matcher)?;
