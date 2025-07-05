@@ -2,7 +2,7 @@ use std::fs;
 use std::{env, path::PathBuf};
 
 use anyhow::{bail, Result};
-use crate::parser::{template::TemplateParser, Parser};
+use crate::parser::{template::TemplateParser, ParserProcedure};
 
 use crate::{selector::Selector, Item, Meta};
 
@@ -35,7 +35,7 @@ pub trait SingleProcedure: Procedure + Sized + Clone {
         }
     }
 
-    fn parse<P: Parser>(self, parser: P) -> Parse<Self, P> {
+    fn parse<P: ParserProcedure>(self, parser: P) -> Parse<Self, P> {
         Parse {
             prior: self,
             parser: parser,
@@ -162,12 +162,12 @@ impl<P: SingleProcedure> SingleProcedure for SetExtension<P> {
 }
 
 #[derive(Clone)]
-pub struct Parse<P: SingleProcedure, PARSER: Parser> {
+pub struct Parse<P: SingleProcedure, PARSER: ParserProcedure> {
     prior: P,
     parser: PARSER,
 }
 
-impl<P: SingleProcedure, PARSER: Parser> SingleProcedure for Parse<P, PARSER> {
+impl<P: SingleProcedure, PARSER: ParserProcedure> SingleProcedure for Parse<P, PARSER> {
     fn eval(&self) -> Result<Item> {
         let item = self.prior.eval()?;
         let (bytes, properties) = self.parser.process(&item.bytes, &item.properties)?;

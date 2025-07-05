@@ -1,10 +1,10 @@
 use anyhow::{anyhow, Result};
-use chumsky::prelude::*;
-use std::{collections::HashMap, fs, path::PathBuf};
+use chumsky::{prelude::*, text::{ident, keyword, newline}};
+use std::{collections::HashMap, env, fs, path::PathBuf};
 
 use crate::Meta;
 
-use super::Parser as ParserProcedure;
+use super::ParserProcedure;
 
 #[derive(Debug, Clone)]
 pub struct TemplateParser();
@@ -15,7 +15,10 @@ impl TemplateParser {
     }
 
     fn make_parser<'src>(&self, properties: HashMap<String, Meta>) -> impl Parser<'src, &'src str, String> {
-        todo()
+        element(properties)
+            .repeated()
+            .collect::<Vec<_>>()
+            .map(|elements| elements.concat())
     }
 }
 
@@ -27,4 +30,68 @@ impl ParserProcedure for TemplateParser {
 
         Ok((text.as_bytes().to_vec(), properties.clone()))
     }
+}
+
+fn element<'src>(properties: HashMap<String, Meta>) -> impl Parser<'src, &'src str, String> + Clone {
+    let element = recursive(move |this| {
+        let this1 = this.clone();
+        let this2 = this.clone();
+        let this3 = this.clone();
+        let this4 = this.clone();
+
+        let props1 = properties.clone();
+        let props2 = properties.clone();
+        let props3 = properties.clone();
+
+        choice((
+            keyword("partial")
+                .ignore_then(none_of("\"")
+                    .repeated()
+                    .collect::<String>()
+                    .delimited_by(just("(\""), just("\")")))
+                .padded_by(just('$'))
+                .try_map(|path, _span| {
+                    fs::read_to_string(env::current_dir().map_err(|_e| EmptyErr::default())?.join(path)).map_err(|_e| EmptyErr::default())
+                })
+                .to_slice()
+                .try_map(move |include, _span| {
+                    this1.parse(include).into_result().map_err(|_e| EmptyErr::default())
+                }),
+            //TODO: foreach
+            keyword("if")
+                .ignore_then(ident()
+                    .delimited_by(just('('), just(')')))
+                .padded_by(just('$'))
+                .then(this3
+                    .and_is(just("$endif$")
+                        .or(just("$elseif$"))
+                        .not())
+                    .repeated()
+                    .collect::<Vec<_>>()
+                    .map(|elements| elements.concat()))
+                .then(just("$elseif$")
+                    .ignore_then(this4
+                        .and_is(just("$endif$")
+                            .not())
+                        .repeated()
+                        .collect::<Vec<_>>()
+                        .map(|elements| elements.concat()))
+                    .or_not())
+                .then_ignore(just("$endif$"))
+                .map(move |((key, then), otherwise)| {
+                    let s = props2.get(key).and_then(Meta::as_string).unwrap_or_else(String::new);
+
+                    if s.len() != 0 {
+                        then
+                    } else {
+                        otherwise.unwrap_or_else(String::new)
+                    }
+                }),
+            ident()
+                .padded_by(just('$'))
+                .map(move |key| props3.get(key).and_then(Meta::as_string).unwrap_or_else(String::new)),
+        ))
+    });
+
+    element.clone().or(any().and_is(element.not()).repeated().at_least(1).collect())
 }

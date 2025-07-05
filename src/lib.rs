@@ -90,6 +90,20 @@ pub enum Meta {
     Text(String),
 }
 
+impl Meta {
+    pub fn as_string(&self) -> Option<String> {
+        match self {
+            Meta::Map(map) => None,
+            Meta::List(items) => Some(items
+                .iter()
+                .flat_map(|m| m.as_string())
+                .collect::<Vec<_>>()
+                .join(", ")),
+            Meta::Text(s) => Some(s.clone()),
+        }
+    }
+}
+
 impl From<HashMap<String, Meta>> for Meta {
     fn from(value: HashMap<String, Meta>) -> Self {
         Self::Map(value)

@@ -6,7 +6,7 @@ use extension::MarkdownExtension;
 
 use crate::Meta;
 
-use super::Parser as ParserProcedure;
+use super::{whitespace, ParserProcedure};
 
 pub mod extension;
 
@@ -97,6 +97,9 @@ fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src
     recursive::<'src, 'src>(|this| {
         let closure = move |inner, _span| this.parse(inner).into_result().map_err(|_e| EmptyErr::default());
         let mut element = choice((
+            just("\\")
+                .ignore_then(any()
+                    .map(|c| format!("{}", c))),
             just("\n\n\n")
                 .ignore_then(any()
                     .and_is(just("\n\n\n").not())
@@ -134,16 +137,6 @@ fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src
 
         element.clone().or(any().and_is(element.not()).repeated().at_least(1).collect())
     })
-}
-
-fn whitespace<'src>() -> impl Parser<'src, &'src str, ()> + Clone {
-    any()
-        .and_is(newline().not())
-        .filter(|c: &char| c.is_whitespace())
-        .ignored()
-        .repeated()
-        .collect::<Vec<()>>()
-        .ignored()
 }
 
 #[cfg(test)]
