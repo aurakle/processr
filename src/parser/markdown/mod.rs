@@ -109,15 +109,6 @@ fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src
                     .try_map(closure.clone()))
                     .map(|s| format!("<p>{}</p>", s)),
             just("\n\n").to(format!("<br/>")),
-            just("\n-#")
-                .padded_by(whitespace())
-                .ignore_then(any()
-                    .and_is(just("\n").not())
-                    .repeated()
-                    .at_least(1)
-                    .to_slice()
-                    .try_map(closure.clone()))
-                    .map(|s| format!("<p><small>{}</small></p>", s)),
             just("\n").to(format!("")),
             //TODO: add image and link support
         )).boxed();
@@ -251,14 +242,16 @@ mod tests {
 
         #[test]
         fn small() {
-            let res = element(&extension::default()).parse("\n-# meow").into_result().unwrap();
-            let expected = format!("<p><small>meow</small></p>");
+            let res = element(&extension::default()).parse("-# meow\n").into_result().unwrap();
+            let expected = format!("<small>meow</small>");
 
             assert_eq!(expected, res);
         }
     }
 
     mod document {
+        use std::fs;
+
         use chumsky::Parser;
 
         use crate::parser::markdown::{document, extension};
@@ -330,8 +323,18 @@ mod tests {
         #[test]
         fn small() {
             let res = document(&extension::default()).parse("meow\n-# meow\nmeow").into_result().unwrap();
-            let expected = format!("meow<p><small>meow</small></p>meow");
+            let expected = format!("meow<small>meow</small>meow");
 
+            assert_eq!(expected, res);
+        }
+
+        #[test]
+        fn whole_document() {
+            let text = fs::read_to_string("test/test.md").unwrap();
+            let res = document(&extension::default()).parse(&text).into_result().unwrap();
+            let expected = fs::read_to_string("test/test.html").unwrap();
+
+            fs::write("test/test.out.txt", res.clone());
             assert_eq!(expected, res);
         }
     }

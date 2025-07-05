@@ -6,11 +6,15 @@ use super::MarkdownExtension;
 
 pub fn all() -> Vec<MarkdownExtension> {
     vec![
+        header1(),
+        header2(),
+        header3(),
+        small(),
+        // spoiler(),
         italic(),
         bold(),
         code(),
         strikethrough(),
-        // spoiler(),
     ]
 }
 
@@ -51,5 +55,37 @@ pub fn spoiler() -> MarkdownExtension {
         start: format!("||"),
         end: format!("||"),
         wrapper: todo!(),
+    }
+}
+
+pub fn header1() -> MarkdownExtension {
+    MarkdownExtension {
+        start: format!("# "),
+        end: format!("\n"),
+        wrapper: |s| format!("<h1>{}</h1>", s),
+    }
+}
+
+pub fn header2() -> MarkdownExtension {
+    MarkdownExtension {
+        start: format!("## "),
+        end: format!("\n"),
+        wrapper: |s| format!("<h2>{}</h2>", s),
+    }
+}
+
+pub fn header3() -> MarkdownExtension {
+    MarkdownExtension {
+        start: format!("### "),
+        end: format!("\n"),
+        wrapper: |s| format!("<h3>{}</h3>", s),
+    }
+}
+
+pub fn small() -> MarkdownExtension {
+    MarkdownExtension {
+        start: format!("-# "),
+        end: format!("\n"),
+        wrapper: |s| format!("<small>{}</small>", s),
     }
 }
