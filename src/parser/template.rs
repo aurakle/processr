@@ -33,7 +33,7 @@ impl ParserProcedure for TemplateParser {
 }
 
 fn element<'src>(properties: HashMap<String, Meta>) -> impl Parser<'src, &'src str, String> + Clone {
-    let element = recursive(move |this| {
+    recursive(move |this| {
         let this1 = this.clone();
         let this2 = this.clone();
         let this3 = this.clone();
@@ -43,7 +43,7 @@ fn element<'src>(properties: HashMap<String, Meta>) -> impl Parser<'src, &'src s
         let props2 = properties.clone();
         let props3 = properties.clone();
 
-        choice((
+        let element = choice((
             keyword("partial")
                 .ignore_then(none_of("\"")
                     .repeated()
@@ -51,13 +51,52 @@ fn element<'src>(properties: HashMap<String, Meta>) -> impl Parser<'src, &'src s
                     .delimited_by(just("(\""), just("\")")))
                 .padded_by(just('$'))
                 .try_map(|path, _span| {
-                    fs::read_to_string(env::current_dir().map_err(|_e| EmptyErr::default())?.join(path)).map_err(|_e| EmptyErr::default())
+                    fs::read_to_string(env::current_dir()
+                        .map_err(|_e| EmptyErr::default())?
+                        .join(path))
+                        .map_err(|_e| EmptyErr::default())
                 })
                 .to_slice()
                 .try_map(move |include, _span| {
-                    this1.parse(include).into_result().map_err(|_e| EmptyErr::default())
+                    this1.clone()
+                        .repeated()
+                        .collect::<Vec<_>>()
+                        .map(|elements| elements.concat())
+                        .parse(include)
+                        .into_result()
+                        .map_err(|_e| EmptyErr::default())
                 }),
-            //TODO: foreach
+            keyword("for")
+                .ignore_then(ident()
+                    .delimited_by(just('('), just(')')))
+                .padded_by(just('$'))
+                .then(any()
+                    .and_is(just("$endfor$").not())
+                    .repeated()
+                    .collect::<String>())
+                .then_ignore(just("$endfor$"))
+                .try_map(move |(key, inner), _span| {
+                    let mut result = Vec::new();
+                    let list = props1.get(key).and_then(Meta::as_list).unwrap_or_else(Vec::new);
+
+                    for item in list {
+                        let mut map = match item.clone() {
+                            Meta::Map(map) => map,
+                            _ => HashMap::new(),
+                        };
+
+                        map.insert(format!("i"), item);
+                        result.push(element(map)
+                            .repeated()
+                            .collect::<Vec<_>>()
+                            .map(|elements| elements.concat())
+                            .parse(inner.as_ref())
+                            .into_result()
+                            .map_err(|_e| EmptyErr::default())?);
+                    }
+
+                    Ok(result.concat())
+                }),
             keyword("if")
                 .ignore_then(ident()
                     .delimited_by(just('('), just(')')))
@@ -90,8 +129,8 @@ fn element<'src>(properties: HashMap<String, Meta>) -> impl Parser<'src, &'src s
             ident()
                 .padded_by(just('$'))
                 .map(move |key| props3.get(key).and_then(Meta::as_string).unwrap_or_else(String::new)),
-        ))
-    });
+        ));
 
-    element.clone().or(any().and_is(element.not()).repeated().at_least(1).collect())
+        element.clone().or(any().and_is(element.not()).repeated().at_least(1).collect())
+    })
 }

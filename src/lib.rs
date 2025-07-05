@@ -102,6 +102,14 @@ impl Meta {
             Meta::Text(s) => Some(s.clone()),
         }
     }
+
+    pub fn as_list(&self) -> Option<Vec<Meta>> {
+        match self {
+            Meta::Map(map) => None,
+            Meta::List(items) => Some(items.clone()),
+            Meta::Text(s) => Some(vec![Meta::Text(s.clone())]),
+        }
+    }
 }
 
 impl From<HashMap<String, Meta>> for Meta {
