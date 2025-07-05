@@ -43,8 +43,8 @@ pub trait SingleProcedure: Procedure + Sized + Clone {
         }
     }
 
-    fn apply<S: Into<PathBuf>>(self, template_path: S) -> Result<Parse<Self, TemplateParser>> {
-        Ok(self.parse(TemplateParser::new(template_path.into())?))
+    fn apply<S: Into<PathBuf>>(self, template_path: S) -> Parse<Self, TemplateParser> {
+        self.parse(TemplateParser::new(template_path.into()))
     }
 }
 
