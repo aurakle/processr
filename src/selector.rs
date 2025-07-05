@@ -7,6 +7,7 @@ use wildmatch::WildMatch;
 
 use crate::{procedure::SingleProcedure, Item};
 
+#[derive(Clone)]
 pub struct Selector(PathBuf);
 
 impl SingleProcedure for Selector {

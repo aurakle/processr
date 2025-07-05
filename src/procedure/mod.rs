@@ -12,7 +12,7 @@ pub trait Procedure: Sized {
     fn write(&self, out: &str) -> Result<()>;
 }
 
-pub trait SingleProcedure: Procedure + Sized {
+pub trait SingleProcedure: Procedure + Sized + Clone {
     fn eval(&self) -> Result<Item>;
 
     fn property(self, key: String, value: Meta) -> SetProperty<Self> {
@@ -49,7 +49,7 @@ pub trait MultiProcedure<P: SingleProcedure>: Procedure + Sized {
     fn chain<O, F>(&self, func: F) -> impl MultiProcedure<O>
     where
         O: SingleProcedure,
-        F: Fn(&P) -> O,
+        F: Fn(P) -> O,
     ;
 }
 
@@ -73,12 +73,19 @@ impl<P: SingleProcedure> MultiProcedure<P> for Vec<P> {
     fn chain<O, F>(&self, func: F) -> impl MultiProcedure<O>
     where
         O: SingleProcedure,
-        F: Fn(&P) -> O,
+        F: Fn(P) -> O,
     {
-        self.iter().map(func).collect::<Vec<_>>()
+        let mut result = Vec::new();
+
+        for p in self {
+            result.push(func(p.clone()));
+        }
+
+        result
     }
 }
 
+#[derive(Clone)]
 pub struct SetProperty<P: SingleProcedure> {
     prior: P,
     key: String,
@@ -91,6 +98,7 @@ impl<P: SingleProcedure> SingleProcedure for SetProperty<P> {
     }
 }
 
+#[derive(Clone)]
 pub struct SetDirectory<P: SingleProcedure> {
     prior: P,
     dir: PathBuf,
@@ -117,6 +125,7 @@ impl<P: SingleProcedure> SingleProcedure for SetDirectory<P> {
     }
 }
 
+#[derive(Clone)]
 pub struct SetExtension<P: SingleProcedure> {
     prior: P,
     extension: String,
@@ -124,10 +133,18 @@ pub struct SetExtension<P: SingleProcedure> {
 
 impl<P: SingleProcedure> SingleProcedure for SetExtension<P> {
     fn eval(&self) -> Result<Item> {
-        todo!()
+        let item = self.prior.eval()?;
+        let path = item.path.with_extension(self.extension.clone()).clone();
+
+        Ok(Item {
+            path,
+            bytes: item.bytes.clone(),
+            properties: item.properties.clone(),
+        })
     }
 }
 
+#[derive(Clone)]
 pub struct Parse<P: SingleProcedure, PARSER: Parser> {
     prior: P,
     parser: PARSER,
