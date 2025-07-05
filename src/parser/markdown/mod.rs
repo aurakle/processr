@@ -115,13 +115,13 @@ fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src
                 .repeated()
                 .to_slice()
                 .padded_by(just('`'))
-                .map(|inner| format!("<code>{}</code>", inner)),
+                .map(|inner| format!("<code>{}</code>", html_escape::encode_safe(inner))),
             any()
                 .and_is(just("```").not())
                 .repeated()
                 .to_slice()
                 .padded_by(just("```"))
-                .map(|inner| format!("<pre><code>{}</code></pre>", inner)),
+                .map(|inner| format!("<pre><code>{}</code></pre>", html_escape::encode_safe(inner))),
             just('!')
                 .ignore_then(
                     group((
