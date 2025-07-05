@@ -30,7 +30,7 @@ pub trait SingleProcedure: Procedure + Sized + Clone {
         }
     }
 
-    fn extensions<S: Into<String>>(self, extension: S) -> SetExtension<Self> {
+    fn extension<S: Into<String>>(self, extension: S) -> SetExtension<Self> {
         SetExtension {
             prior: self,
             extension: extension.into(),
