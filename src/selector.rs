@@ -56,17 +56,17 @@ where
         if path.is_dir() {
             let mut inner = recursive_search(&path, matcher)?;
             result.append(&mut inner);
-        }
+        } else {
+            let file_name = path
+                .file_name()
+                .map(|os_str| Path::new(os_str))
+                .ok_or(FindError::InvalidFileName)?
+                .to_str()
+                .ok_or(FindError::OsStringNotUtf8)?;
 
-        let file_name = path
-            .file_name()
-            .map(|os_str| Path::new(os_str))
-            .ok_or(FindError::InvalidFileName)?
-            .to_str()
-            .ok_or(FindError::OsStringNotUtf8)?;
-
-        if matcher(file_name) {
-            result.push(path);
+            if matcher(file_name) {
+                result.push(path);
+            }
         }
     }
 
