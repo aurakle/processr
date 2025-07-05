@@ -1,9 +1,9 @@
 use std::{env, fs, path::{Path, PathBuf}};
 
-use file_matcher::{FileNamed, FilesNamed};
 use regex::Regex;
 use anyhow::{anyhow, Context, Result};
 use thiserror::Error;
+use wildmatch::WildMatch;
 
 use crate::{procedure::SingleProcedure, Item};
 
@@ -15,41 +15,55 @@ impl SingleProcedure for Selector {
     }
 }
 
-pub fn single(path: &str) -> Result<Selector> {
-    fs::exists(path).with_context(|| "Could not check whether file exists").and_then(|b| {
+pub fn exact(path: &str) -> Result<Selector> {
+    fs::exists(path).map_err(|e| FindError::IoError(e)).and_then(|b| {
         if b {
             Ok(Selector(PathBuf::from(path)))
         } else {
-            Err(anyhow!("File does not exist"))
+            Err(FindError::FileNotFound)
         }
-    })
+    }).with_context(|| format!("Failed to locate file at '{}'", path))
 }
 
 pub fn regex(pat: &str) -> Result<Vec<Selector>> {
     let (base, file_name) = resolve_split_path(pat)?;
-    let paths = recursive_search(&PathBuf::from(base), &FilesNamed::regex(file_name))?;
+    let r = Regex::new(file_name.as_str())?;
+    let paths = recursive_search(&PathBuf::from(base), &|p| r.is_match(p))?;
 
     Ok(make_selectors_for_paths(paths))
 }
 
 pub fn wild(pat: &str) -> Result<Vec<Selector>> {
     let (base, file_name) = resolve_split_path(pat)?;
-    let paths = recursive_search(&PathBuf::from(base), &FilesNamed::wildmatch(file_name))?;
+    let r = WildMatch::new(file_name.as_str());
+    let paths = recursive_search(&PathBuf::from(base), &|p| r.is_match(p))?;
 
     Ok(make_selectors_for_paths(paths))
 }
 
-fn recursive_search(dir: &Path, matcher: &FilesNamed) -> Result<Vec<PathBuf>> {
-    let mut result = matcher.within(dir).find()?;
+fn recursive_search<F>(dir: &Path, matcher: &F) -> Result<Vec<PathBuf>>
+where
+    F: Fn(&str) -> bool,
+{
+    let mut result = Vec::new();
 
     for entry in fs::read_dir(dir)? {
         let path = entry?.path();
 
         if path.is_dir() {
-            let mut current = matcher.within(&path).find()?;
             let mut inner = recursive_search(&path, matcher)?;
-            result.append(&mut current);
             result.append(&mut inner);
+        }
+
+        let file_name = path
+            .file_name()
+            .map(|os_str| Path::new(os_str))
+            .ok_or(FindError::InvalidFileName)?
+            .to_str()
+            .ok_or(FindError::OsStringNotUtf8)?;
+
+        if matcher(file_name) {
+            result.push(path);
         }
     }
 
@@ -89,6 +103,8 @@ fn make_selectors_for_paths(paths: Vec<PathBuf>) -> Vec<Selector> {
 enum FindError {
     #[error(transparent)]
     RegexError(#[from] regex::Error),
+    #[error("File not found")]
+    FileNotFound,
     #[error("Not a valid file name")]
     InvalidFileName,
     #[error("No valid base file")]
