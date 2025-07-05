@@ -13,6 +13,7 @@ pub fn all() -> Vec<MarkdownExtension> {
         // spoiler(),
         italic(),
         bold(),
+        code_block(),
         code(),
         strikethrough(),
     ]
@@ -31,6 +32,14 @@ pub fn bold() -> MarkdownExtension {
         start: format!("**"),
         end: format!("**"),
         wrapper: |s| format!("<b>{}</b>", s),
+    }
+}
+
+pub fn code_block() -> MarkdownExtension {
+    MarkdownExtension {
+        start: format!("```"),
+        end: format!("```"),
+        wrapper: |s| todo!(),
     }
 }
 

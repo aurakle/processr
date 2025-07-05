@@ -109,7 +109,24 @@ fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src
                     .try_map(closure.clone()))
                     .map(|s| format!("<p>{}</p>", s)),
             just("\n\n").to(format!("<br/>")),
-            just("\n").to(format!("")),
+            just('\n').to(format!("")),
+            group((
+                any()
+                    .and_is(just(']').not())
+                    .repeated()
+                    .to_slice()
+                    .try_map(closure.clone())
+                    .delimited_by(just('['), just(']')),
+                any()
+                    .and_is(just(')').not())
+                    .repeated()
+                    .to_slice()
+                    .try_map(closure.clone())
+                    .delimited_by(just('('), just(')')),
+            ))
+                .map(|(text, link)| {
+                    format!("<a href=\"{}\">{}</a>", link, text)
+                })
             //TODO: add image and link support
         )).boxed();
 
@@ -241,6 +258,30 @@ mod tests {
         }
 
         #[test]
+        fn header1() {
+            let res = element(&extension::default()).parse("# meow\n").into_result().unwrap();
+            let expected = format!("<h1>meow</h1>");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
+        fn header2() {
+            let res = element(&extension::default()).parse("## meow\n").into_result().unwrap();
+            let expected = format!("<h2>meow</h2>");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
+        fn header3() {
+            let res = element(&extension::default()).parse("### meow\n").into_result().unwrap();
+            let expected = format!("<h3>meow</h3>");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
         fn small() {
             let res = element(&extension::default()).parse("-# meow\n").into_result().unwrap();
             let expected = format!("<small>meow</small>");
@@ -316,6 +357,30 @@ mod tests {
         fn strikethrough() {
             let res = document(&extension::default()).parse("meow~~meow~~meow").into_result().unwrap();
             let expected = format!("meow<s>meow</s>meow");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
+        fn header1() {
+            let res = document(&extension::default()).parse("meow\n# meow\nmeow").into_result().unwrap();
+            let expected = format!("meow<h1>meow</h1>meow");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
+        fn header2() {
+            let res = document(&extension::default()).parse("meow\n## meow\nmeow").into_result().unwrap();
+            let expected = format!("meow<h2>meow</h2>meow");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
+        fn header3() {
+            let res = document(&extension::default()).parse("meow\n### meow\nmeow").into_result().unwrap();
+            let expected = format!("meow<h3>meow</h3>meow");
 
             assert_eq!(expected, res);
         }
