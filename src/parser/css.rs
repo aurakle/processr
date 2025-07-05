@@ -21,8 +21,13 @@ impl ParserProcedure for CssCompressor {
 
         while text.len() < last_len {
             last_len = text.len();
-            text = text.replace("	", " ");
-            text = text.replace("  ", " ");
+            text = text
+                .replace("{ ", "{")
+                .replace("} ", "}")
+                .replace(": ", ":")
+                .replace("; ", ";")
+                .replace("	", " ")
+                .replace("  ", " ");
         }
 
         Ok((text.as_bytes().to_vec(), properties.clone()))
