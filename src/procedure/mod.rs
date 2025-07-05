@@ -14,10 +14,10 @@ pub trait Procedure: Sized {
 pub trait SingleProcedure: Procedure + Sized + Clone {
     fn eval(&self) -> Result<Item>;
 
-    fn property(self, key: String, value: Meta) -> SetProperty<Self> {
+    fn property<S: Into<String>>(self, key: S, value: Meta) -> SetProperty<Self> {
         SetProperty {
             prior: self,
-            key,
+            key: key.into(),
             value,
         }
     }
