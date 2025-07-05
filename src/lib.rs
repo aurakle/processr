@@ -8,7 +8,7 @@ pub mod selector;
 macro_rules! processr {
     ($out:literal <- $(rule $rules:expr)+) => {
         fn main() -> anyhow::Result<()> {
-            $($rules.write($out)?;)+
+            $($crate::procedure::Procedure::write($rules, $out)?;)+
 
             Ok(())
         }
