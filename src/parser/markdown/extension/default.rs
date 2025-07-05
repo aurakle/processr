@@ -15,6 +15,7 @@ pub fn all() -> Vec<MarkdownExtension> {
         bold(),
         code(),
         strikethrough(),
+        underline(),
     ]
 }
 
@@ -87,5 +88,13 @@ pub fn strikethrough() -> MarkdownExtension {
         start: format!("~~"),
         end: format!("~~"),
         wrapper: |s| format!("<s>{}</s>", s),
+    }
+}
+
+pub fn underline() -> MarkdownExtension {
+    MarkdownExtension {
+        start: format!("__"),
+        end: format!("__"),
+        wrapper: |s| format!("<u>{}</u>", s),
     }
 }

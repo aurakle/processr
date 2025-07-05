@@ -38,25 +38,25 @@ fn make_parser<'src>(properties: HashMap<String, Meta>) -> impl Parser<'src, &'s
         let props3 = properties.clone();
         let props4 = properties.clone();
 
-        let partial = keyword("partial")
-            .ignore_then(none_of("\"")
+        let include = keyword("include")
+            .ignore_then(any()
+                .and_is(just("\")").not())
                 .repeated()
                 .collect::<String>()
+                .try_map(move |path, _span| {
+                    let text = fs::read_to_string(env::current_dir()
+                        .map_err(|_e| EmptyErr::default())?
+                        .join(path))
+                        .map_err(|_e| EmptyErr::default())?;
+                    let parser = make_parser(props1.clone());
+                    let res = parser.parse(&text)
+                        .into_result()
+                        .map_err(|_e| EmptyErr::default());
+
+                    res
+                })
                 .delimited_by(just("(\""), just("\")")))
-            .padded_by(just('$'))
-            .try_map(|path, _span| {
-                fs::read_to_string(env::current_dir()
-                    .map_err(|_e| EmptyErr::default())?
-                    .join(path))
-                    .map_err(|_e| EmptyErr::default())
-            })
-            .to_slice()
-            .try_map(move |include, _span| {
-                make_parser(props1.clone())
-                    .parse(include)
-                    .into_result()
-                    .map_err(|_e| EmptyErr::default())
-            });
+            .padded_by(just('$'));
 
         let foreach = keyword("for")
             .ignore_then(ident()
@@ -110,7 +110,7 @@ fn make_parser<'src>(properties: HashMap<String, Meta>) -> impl Parser<'src, &'s
             .map(move |key| props4.get(key).and_then(Meta::as_string).unwrap_or_else(String::new));
 
         let element = choice((
-            partial,
+            include,
             foreach,
             if_else,
             access,
@@ -140,8 +140,8 @@ mod tests {
     fn plain() {
         let props = HashMap::new();
         let parser = make_parser(props);
-        let res = parser.parse("meowmeow").into_result().unwrap();
-        let expected = format!("meowmeow");
+        let res = parser.parse("meow meow").into_result().unwrap();
+        let expected = format!("meow meow");
 
         assert_eq!(expected, res);
     }
@@ -182,11 +182,10 @@ mod tests {
     }
 
     #[test]
-    fn partial() {
-        todo!(); //TODO: this causes OOM death probably
+    fn include() {
         let mut props = HashMap::new();
         let parser = make_parser(props);
-        let res = parser.parse("$partial(\"test/templates/partial.txt\")$").into_result().unwrap();
+        let res = parser.parse("$include(\"test/templates/partial.txt\")$").into_result().unwrap();
         let expected = fs::read_to_string("test/templates/partial.txt").unwrap();
 
         assert_eq!(expected, res);

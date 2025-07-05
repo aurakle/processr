@@ -116,6 +116,27 @@ fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src
                 .to_slice()
                 .delimited_by(just('`'), just('`'))
                 .map(|inner| format!("<code>{}</code>", inner)),
+            just('!')
+                .ignore_then(
+                    group((
+                        any()
+                            .and_is(just(']').not())
+                            .repeated()
+                            .to_slice()
+                            .try_map(closure.clone())
+                            .or_not()
+                            .delimited_by(just('['), just(']')),
+                        any()
+                            .and_is(just(')').not())
+                            .repeated()
+                            .to_slice()
+                            .try_map(closure.clone())
+                            .or_not()
+                            .delimited_by(just('('), just(')')),
+                    )))
+                .map(|(text, link)| {
+                    format!("<img src=\"{}\" alt=\"{}\"/>", link.unwrap_or_else(String::new), text.unwrap_or_else(String::new))
+                }),
             group((
                 any()
                     .and_is(just(']').not())
@@ -134,7 +155,7 @@ fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src
             ))
                 .map(|(text, link)| {
                     format!("<a href=\"{}\">{}</a>", link.unwrap_or_else(String::new), text.unwrap_or_else(String::new))
-                })
+                }),
             //TODO: add image and link support
         )).boxed();
 
@@ -266,6 +287,14 @@ mod tests {
         }
 
         #[test]
+        fn underline() {
+            let res = element(&extension::default()).parse("__meow__").into_result().unwrap();
+            let expected = format!("<u>meow</u>");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
         fn header1() {
             let res = element(&extension::default()).parse("# meow\n").into_result().unwrap();
             let expected = format!("<h1>meow</h1>");
@@ -293,6 +322,38 @@ mod tests {
         fn small() {
             let res = element(&extension::default()).parse("-# meow\n").into_result().unwrap();
             let expected = format!("<small>meow</small>");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
+        fn link_with_text() {
+            let res = element(&extension::default()).parse("[mraow](prrr)").into_result().unwrap();
+            let expected = format!("<a href=\"prrr\">mraow</a>");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
+        fn empty_link() {
+            let res = element(&extension::default()).parse("[]()").into_result().unwrap();
+            let expected = format!("<a href=\"\"></a>");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
+        fn link_without_text() {
+            let res = element(&extension::default()).parse("[](prrr)").into_result().unwrap();
+            let expected = format!("<a href=\"prrr\"></a>");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
+        fn text_without_link() {
+            let res = element(&extension::default()).parse("[mraow]()").into_result().unwrap();
+            let expected = format!("<a href=\"\">mraow</a>");
 
             assert_eq!(expected, res);
         }
@@ -370,6 +431,14 @@ mod tests {
         }
 
         #[test]
+        fn underline() {
+            let res = document(&extension::default()).parse("meow__meow__meow").into_result().unwrap();
+            let expected = format!("meow<u>meow</u>meow");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
         fn header1() {
             let res = document(&extension::default()).parse("meow\n# meow\nmeow").into_result().unwrap();
             let expected = format!("meow<h1>meow</h1>meow");
@@ -397,6 +466,38 @@ mod tests {
         fn small() {
             let res = document(&extension::default()).parse("meow\n-# meow\nmeow").into_result().unwrap();
             let expected = format!("meow<small>meow</small>meow");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
+        fn link_with_text() {
+            let res = document(&extension::default()).parse("meow[mraow](prrr)meow").into_result().unwrap();
+            let expected = format!("meow<a href=\"prrr\">mraow</a>meow");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
+        fn empty_link() {
+            let res = document(&extension::default()).parse("meow[]()meow").into_result().unwrap();
+            let expected = format!("meow<a href=\"\"></a>meow");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
+        fn link_without_text() {
+            let res = document(&extension::default()).parse("meow[](prrr)meow").into_result().unwrap();
+            let expected = format!("meow<a href=\"prrr\"></a>meow");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
+        fn text_without_link() {
+            let res = document(&extension::default()).parse("meow[mraow]()meow").into_result().unwrap();
+            let expected = format!("meow<a href=\"\">mraow</a>meow");
 
             assert_eq!(expected, res);
         }

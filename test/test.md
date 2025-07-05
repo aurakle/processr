@@ -48,6 +48,16 @@ code block with json
 
 [without link](https://without.link)
 
+[]()
+
+![embed image with alt](https://embed.image.with.alt)
+
+![](https://embed.image.without.alt)
+
+![missing image embed]()
+
+![]()
+
 # Escape character
 
 \*italics\*
