@@ -114,8 +114,14 @@ fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src
                 .and_is(just('`').not())
                 .repeated()
                 .to_slice()
-                .delimited_by(just('`'), just('`'))
+                .padded_by(just('`'))
                 .map(|inner| format!("<code>{}</code>", inner)),
+            any()
+                .and_is(just("```").not())
+                .repeated()
+                .to_slice()
+                .padded_by(just("```"))
+                .map(|inner| format!("<pre><code>{}</code></pre>", inner)),
             just('!')
                 .ignore_then(
                     group((

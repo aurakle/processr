@@ -1,4 +1,4 @@
-<h1>Headers</h1><h1>Header1</h1><h2>Header2</h2><h3>Header2</h3><small>small</small><h1>Styling</h1><i>italics</i><br/><b>bold</b><br/><s>strikethrough</s><br/><u>underscore</u><br/>||spoiler||<br/><h1>Code</h1><code>code line</code><br/><code></code><code>
+<h1>Headers</h1><h1>Header1</h1><h2>Header2</h2><h3>Header2</h3><small>small</small><h1>Styling</h1><i>italics</i><br/><b>bold</b><br/><s>strikethrough</s><br/><u>underscore</u><br/><h1>Code</h1><code>code line</code><br/><code></code><code>
 code block
 </code><code></code><br/><code></code><code>json
 code block with json

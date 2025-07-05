@@ -10,7 +10,6 @@ pub fn all() -> Vec<MarkdownExtension> {
         header2(),
         header3(),
         small(),
-        // spoiler(),
         italic(),
         bold(),
         code(),
@@ -48,14 +47,6 @@ pub fn small() -> MarkdownExtension {
         start: format!("-# "),
         end: format!("\n"),
         wrapper: |s| format!("<small>{}</small>", s),
-    }
-}
-
-pub fn spoiler() -> MarkdownExtension {
-    MarkdownExtension {
-        start: format!("||"),
-        end: format!("||"),
-        wrapper: todo!(),
     }
 }
 

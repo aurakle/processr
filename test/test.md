@@ -18,8 +18,6 @@
 
 __underscore__
 
-||spoiler||
-
 # Code
 
 `code line`
