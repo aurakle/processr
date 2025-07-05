@@ -75,7 +75,9 @@ where
 
 fn resolve_split_path(pat: &str) -> Result<(String, String)> {
     let current_dir = env::current_dir()?;
-    let path = PathBuf::from(pat);
+    let mut path = current_dir.clone();
+    path.push(pat);
+
     let base = path
         .parent()
         .unwrap_or(&current_dir)
