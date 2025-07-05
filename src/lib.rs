@@ -91,6 +91,7 @@ pub enum Meta {
 }
 
 impl Meta {
+    //TODO: add support for maps
     pub fn as_string(&self) -> Option<String> {
         match self {
             Meta::Map(map) => None,
@@ -103,11 +104,29 @@ impl Meta {
         }
     }
 
-    pub fn as_list(&self) -> Option<Vec<Meta>> {
+    pub fn as_list(&self) -> Vec<Meta> {
         match self {
-            Meta::Map(map) => None,
-            Meta::List(items) => Some(items.clone()),
-            Meta::Text(s) => Some(vec![Meta::Text(s.clone())]),
+            Meta::Map(map) => vec![Meta::Map(map.clone())],
+            Meta::List(items) => items.clone(),
+            Meta::Text(s) => vec![Meta::Text(s.clone())],
+        }
+    }
+
+    pub fn as_map(&self) -> HashMap<String, Meta> {
+        match self {
+            Meta::Map(map) => map.clone(),
+            Meta::List(items) => {
+                let mut map = HashMap::new();
+                map.insert(format!("i"), Meta::List(items.clone()));
+
+                map
+            },
+            Meta::Text(s) => {
+                let mut map = HashMap::new();
+                map.insert(format!("i"), Meta::Text(s.clone()));
+
+                map
+            },
         }
     }
 }

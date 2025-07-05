@@ -43,17 +43,16 @@ fn make_parser<'src>(properties: HashMap<String, Meta>) -> impl Parser<'src, &'s
                 .and_is(just("\")").not())
                 .repeated()
                 .collect::<String>()
-                .try_map(move |path, _span| {
-                    let text = fs::read_to_string(env::current_dir()
+                .try_map(|path, _span| {
+                    fs::read_to_string(env::current_dir()
                         .map_err(|_e| EmptyErr::default())?
                         .join(path))
-                        .map_err(|_e| EmptyErr::default())?;
-                    let parser = make_parser(props1.clone());
-                    let res = parser.parse(&text)
+                        .map_err(|_e| EmptyErr::default())
+                })
+                .try_map(move |inner, _span| {
+                    make_parser(props1.clone()).parse(inner.as_ref())
                         .into_result()
-                        .map_err(|_e| EmptyErr::default());
-
-                    res
+                        .map_err(|_e| EmptyErr::default())
                 })
                 .delimited_by(just("(\""), just("\")")))
             .padded_by(just('$'));
@@ -69,16 +68,10 @@ fn make_parser<'src>(properties: HashMap<String, Meta>) -> impl Parser<'src, &'s
             .then_ignore(just("$endfor$"))
             .try_map(move |(key, inner), _span| {
                 let mut result = Vec::new();
-                let list = props2.get(key).and_then(Meta::as_list).unwrap_or_else(Vec::new);
+                let list = props2.get(key).map(Meta::as_list).unwrap_or_else(Vec::new);
 
                 for item in list {
-                    let mut map = match item.clone() {
-                        Meta::Map(map) => map,
-                        _ => HashMap::new(),
-                    };
-
-                    map.insert(format!("i"), item);
-                    result.push(make_parser(map)
+                    result.push(make_parser(item.as_map())
                         .parse(inner.as_ref())
                         .into_result()
                         .map_err(|_e| EmptyErr::default())?);
@@ -193,7 +186,26 @@ mod tests {
 
     #[test]
     fn for_each() {
-        todo!()
+        let mut props = HashMap::new();
+        let mut m1 = HashMap::new();
+        m1.insert(format!("url"), Meta::from("test1"));
+        m1.insert(format!("body"), Meta::from("meow"));
+        m1.insert(format!("field1"), Meta::from("pr"));
+        let mut m2 = HashMap::new();
+        m1.insert(format!("url"), Meta::from("test2"));
+        m1.insert(format!("body"), Meta::from("meow meow"));
+        m1.insert(format!("field1"), Meta::from("prr"));
+        let mut m3 = HashMap::new();
+        m1.insert(format!("url"), Meta::from("test3"));
+        m1.insert(format!("body"), Meta::from("meow meow meow"));
+        m1.insert(format!("field1"), Meta::from("prrr"));
+        let l = vec![Meta::from(m1), Meta::from(m2), Meta::from(m3)];
+        props.insert(format!("items"), Meta::from(l));
+        let parser = make_parser(props);
+        let res = parser.parse("$for(items)$$url$$body$$field1$$endfor$").into_result().unwrap();
+        let expected = format!("test1meowprtest2meow meowprrtest3meow meow meowprrr");
+
+        assert_eq!(expected, res);
     }
 
     #[test]

@@ -15,6 +15,7 @@ impl CssCompressor {
 }
 
 impl ParserProcedure for CssCompressor {
+    //TODO: stop this from modifying string literals
     fn process(&self, bytes: &Vec<u8>, properties: &HashMap<String, Meta>) -> Result<(Vec<u8>, HashMap<String, Meta>)> {
         let mut text = String::from_utf8(bytes.clone())?.replace("\n", "");
         let mut last_len = text.len() * 2;
