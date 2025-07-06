@@ -61,6 +61,7 @@ pub trait SingleProcedure: Procedure + Sized + Clone {
         }
     }
 
+    /// https://time-rs.github.io/book/api/format-description.html
     fn load_date(self, format: &'static [time::format_description::BorrowedFormatItem<'static>]) -> LoadDate<Self> {
         LoadDate {
             prior: self,

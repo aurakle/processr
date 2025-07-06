@@ -45,7 +45,7 @@ fn make_parser<'src>() -> impl Parser<'src, &'src str, String> {
             .at_least(1)
             .collect::<String>()
             .map(|s| {
-                let mut s = s;
+                let mut s = s.replace("\n", "");
                 let mut last_len = s.len() * 2;
 
                 while s.len() < last_len {
