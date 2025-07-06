@@ -4,6 +4,10 @@ use actix_web::{web::{self, Data}, App, HttpRequest, HttpResponse, HttpServer, R
 use anyhow::{Result, anyhow};
 use procedure::SingleProcedure;
 
+pub extern crate anyhow;
+pub extern crate actix_web;
+pub extern crate env_logger;
+
 pub mod prelude;
 pub mod parser;
 pub mod procedure;
@@ -43,11 +47,11 @@ struct BuildArgs {
 #[macro_export]
 macro_rules! processr {
     ($out:literal <- $($names:ident $rules:expr)+) => {
-        #[actix_web::main]
-        fn main() -> anyhow::Result<()> {
-            env_logger::Builder::from_default_env()
-                .target(Target::Stdout)
-                .filter_level(LevelFilter::Info)
+        #[$crate::actix_web::main]
+        fn main() -> $crate::anyhow::Result<()> {
+            $crate::env_logger::Builder::from_default_env()
+                .target($crate::env_logger::Target::Stdout)
+                .filter_level($crate::env_logger::LevelFilter::Info)
                 .init();
 
             match $crate::Cli::parse().command {
@@ -61,7 +65,7 @@ macro_rules! processr {
             }
         }
 
-        fn build(clean: bool) -> anyhow::Result<()> {
+        fn build(clean: bool) -> $crate::anyhow::Result<()> {
             if clean {
                 $crate::clean($out)?
             }
