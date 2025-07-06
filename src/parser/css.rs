@@ -27,18 +27,25 @@ impl ParserProcedure for CssCompressor {
 fn make_parser<'src>() -> impl Parser<'src, &'src str, String> {
     let escaped = choice((
         any()
-            .and_is(just('\'').not())
+            .and_is(just("*/").not())
             .repeated()
-            .padded_by(just('\'')),
+            .delimited_by(just("/*"), just("*/"))
+            .to(String::new()),
         any()
             .and_is(just('\"').not())
             .repeated()
-            .padded_by(just('\"')),
-    ))
-        .to_slice()
-        .map(String::from);
+            .padded_by(just('\"'))
+            .to_slice()
+            .map(String::from),
+        any()
+            .and_is(just('\'').not())
+            .repeated()
+            .padded_by(just('\''))
+            .to_slice()
+            .map(String::from),
+    ));
 
-    escaped
+    escaped.clone()
         .or(any()
             .and_is(escaped.not())
             .repeated()
@@ -56,7 +63,11 @@ fn make_parser<'src>() -> impl Parser<'src, &'src str, String> {
                         .replace("} ", "}")
                         .replace(" }", "}")
                         .replace(": ", ":")
+                        .replace(" :", ":")
                         .replace("; ", ";")
+                        .replace(" ;", ";")
+                        .replace(", ", ",")
+                        .replace(" ,", ",")
                         .replace("	", " ")
                         .replace("  ", " ");
                 }
