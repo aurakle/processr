@@ -4,9 +4,10 @@ use std::{env, path::PathBuf};
 use anyhow::{bail, Result};
 use crate::parser::{template::TemplateParser, ParserProcedure};
 
+use crate::selector;
 use crate::{selector::Selector, Item, Meta};
 
-pub trait Procedure: Sized {
+pub trait Procedure: Sized + Clone {
     fn write(&self, out: &str) -> Result<()>;
 }
 
@@ -42,15 +43,29 @@ pub trait SingleProcedure: Procedure + Sized + Clone {
         }
     }
 
-    fn apply<S: Into<PathBuf>>(self, template: S) -> ApplyTemplate<Self> {
+    fn apply<T: SingleProcedure>(self, template: T) -> ApplyTemplate<Self, T> {
         ApplyTemplate {
             prior: self,
-            template: template.into(),
+            template,
+        }
+    }
+
+    fn load_and_apply(self, path: &str) -> Result<ApplyTemplate<Self, Selector>> {
+        Ok(self.apply(selector::exact(path)?))
+    }
+
+    fn map<F>(self, func: F) -> Map<Self, F>
+    where
+        F: Fn(Item) -> Result<Item> + Clone,
+    {
+        Map {
+            prior: self,
+            func,
         }
     }
 }
 
-pub trait MultiProcedure<P: SingleProcedure>: Procedure + Sized {
+pub trait MultiProcedure<P: SingleProcedure>: Procedure + Sized + Clone {
     fn chain<O, F>(self, func: F) -> impl MultiProcedure<O>
     where
         O: SingleProcedure,
@@ -181,22 +196,45 @@ impl<P: SingleProcedure, PARSER: ParserProcedure> SingleProcedure for Parse<P, P
 }
 
 #[derive(Clone)]
-pub struct ApplyTemplate<P: SingleProcedure> {
+pub struct ApplyTemplate<P: SingleProcedure, T: SingleProcedure> {
     prior: P,
-    template: PathBuf,
+    template: T,
 }
 
-impl<P: SingleProcedure> SingleProcedure for ApplyTemplate<P> {
+impl<P: SingleProcedure, T: SingleProcedure> SingleProcedure for ApplyTemplate<P, T> {
     fn eval(&self) -> Result<Item> {
         let item = self.prior.eval()?;
-        let properties = item.properties_with_url_and_body()?;
-        let template = fs::read(self.template.clone())?;
-        let (bytes, properties) = TemplateParser::default().process(&template, &properties)?;
+        let template = self.template.eval()?;
+        let bytes = template.bytes;
+        let mut properties = template.properties.clone();
+        properties.extend(item.properties_with_url_and_body()?);
+
+        let (bytes, properties) = TemplateParser::default().process(&bytes, &properties)?;
 
         Ok(Item {
             path: item.path.clone(),
             bytes,
             properties,
         })
+    }
+}
+
+#[derive(Clone)]
+pub struct Map<P, F>
+where
+    P: SingleProcedure,
+    F: Fn(Item) -> Result<Item> + Clone,
+{
+    prior: P,
+    func: F,
+}
+
+impl<P, F> SingleProcedure for Map<P, F>
+where
+    P: SingleProcedure,
+    F: Fn(Item) -> Result<Item> + Clone,
+{
+    fn eval(&self) -> Result<Item> {
+        (self.func)(self.prior.eval()?)
     }
 }

@@ -4,9 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+actix-files = "0.6.6"
+actix-web = "4.11.0"
 anyhow = "1.0.98"
 chumsky = "0.10.1"
-clap = "4.5.40"
+clap = { version = "4.5.40", features = ["derive"] }
+env_logger = "0.11.8"
 html-escape = "0.2.13"
 rand = "0.9.1"
 regex = "1.11.1"

@@ -1,4 +1,6 @@
 use std::{collections::HashMap, env, fmt::Display, fs, path::{Path, PathBuf}};
+use actix_files::NamedFile;
+use actix_web::{web::{self, Data}, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use anyhow::{Result, anyhow};
 use procedure::SingleProcedure;
 
@@ -8,10 +10,62 @@ pub mod procedure;
 pub mod selector;
 pub mod extractor;
 
+#[derive(Debug, clap::Parser)]
+#[command(name = "processr")]
+#[command(about = "Static site generator configured through a Rust macro DSL", long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Command,
+}
+
+#[derive(Debug, clap::Subcommand)]
+enum Command {
+    Serve(ServeArgs),
+    Build(BuildArgs),
+}
+
+#[derive(clap::Args, Debug, Clone)]
+#[command(about = "Build the website and serve it on localhost", long_about = None)]
+struct ServeArgs {
+    #[arg(short, long, default_value_t = 80, help = "The port to serve files on")]
+    port: u16,
+    #[arg(short, long, help = "Clean output directory before building")]
+    clean: bool,
+}
+
+#[derive(clap::Args, Debug, Clone)]
+#[command(about = "Build the website", long_about = None)]
+struct BuildArgs {
+    #[arg(short, long, help = "Clean output directory before building")]
+    clean: bool,
+}
+
 #[macro_export]
 macro_rules! processr {
     ($out:literal <- $($names:ident $rules:expr)+) => {
+        #[actix_web::main]
         fn main() -> anyhow::Result<()> {
+            env_logger::Builder::from_default_env()
+                .target(Target::Stdout)
+                .filter_level(LevelFilter::Info)
+                .init();
+
+            match $crate::Cli::parse().command {
+                $crate::Command::Serve(args) => {
+                    build(args.clean)?;
+                    $crate::serve($out, args.port)?;
+                },
+                $crate::Command::Build(args) => {
+                    build(args.clean)?;
+                }
+            }
+        }
+
+        fn build(clean: bool) -> anyhow::Result<()> {
+            if clean {
+                $crate::clean($out)?
+            }
+
             $(let $names = $rules; $crate::procedure::Procedure::write(&$names, $out)?;)+
 
             Ok(())
@@ -160,5 +214,35 @@ pub fn create(path: &str) -> Item {
         path: PathBuf::from(path),
         bytes: Vec::new(),
         properties: HashMap::new(),
+    }
+}
+
+pub fn clean(path: &str) -> Result<()> {
+    let pwd = env::current_dir()?;
+    let path = pwd.join(path);
+
+    fs::remove_dir_all(path)?;
+    Ok(())
+}
+
+pub fn serve(path: &str, port: u16) -> Result<()> {
+    let path = path.to_owned();
+    let server = HttpServer::new(move || {
+        App::new()
+            .app_data(Data::new(PathBuf::from(path.clone())))
+            .service(file)
+    })
+    .bind(("localhost", port))?;
+
+    server.run();
+    Ok(())
+}
+
+#[actix_web::get("/{other_url:.*}")]
+async fn file(req: HttpRequest, root: Data<PathBuf>) -> impl Responder {
+    let file = root.join(req.path());
+    match NamedFile::open_async(file).await {
+        Ok(res) => res.respond_to(&req),
+        Err(_) => HttpResponse::InternalServerError().finish(),
     }
 }
