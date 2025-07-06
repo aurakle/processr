@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 use chumsky::{prelude::*, text::{ident, newline}};
 use extension::MarkdownExtension;
 use fronma::parser::parse;
-use markdown_ppp::{html_printer::{config::Config, render_html}, parser::{parse_markdown, MarkdownParserState}};
+use markdown_ppp::{html_printer::{config::Config, render_html}, parser::{config::MarkdownParserConfig, parse_markdown, MarkdownParserState}};
 
 use crate::data::Value;
 
@@ -12,7 +12,7 @@ use super::{whitespace, ParserProcedure};
 
 pub mod extension;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct MarkdownParser {
     extensions: Vec<MarkdownExtension>,
 }
@@ -33,6 +33,19 @@ impl MarkdownParser {
             extensions
         }
     }
+
+    fn configure(&self) -> MarkdownParserConfig {
+        let mut config = MarkdownParserConfig::default();
+
+        for extension in self.extensions.clone() {
+            config = match extension {
+                MarkdownExtension::Inline(func) => config.with_custom_inline_parser(func),
+                MarkdownExtension::Block(func) => config.with_custom_block_parser(func),
+            }
+        }
+
+        config
+    }
 }
 
 impl ParserProcedure for MarkdownParser {
@@ -45,11 +58,14 @@ impl ParserProcedure for MarkdownParser {
                 fronma::error::Error::SerdeYaml(e) => anyhow!("Failed to parse YAML frontmatter: {}", e),
             }
         })?;
-        let config = Config::default();
+
+        let parser_config = self.configure();
         let state = MarkdownParserState::default();
         //TODO: add extensions
         let ast = parse_markdown(state, data.body).map_err(|e| anyhow!("Failed to parse markdown body: {}", e))?;
 
-        Ok((render_html(&ast, config).as_bytes().to_vec(), data.headers))
+        let printer_config = Config::default();
+
+        Ok((render_html(&ast, printer_config).as_bytes().to_vec(), data.headers))
     }
 }

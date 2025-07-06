@@ -12,6 +12,7 @@ clap = { version = "4.5.40", features = ["derive"] }
 fronma = "0.2.0"
 html-escape = "0.2.13"
 markdown-ppp = "2.0.1"
+nom = "8.0.0"
 rand = "0.9.1"
 regex = "1.11.1"
 serde = { version = "1.0.219", features = ["derive"] }
