@@ -25,7 +25,7 @@ impl MarkdownExtension {
 
 pub fn wobbly() -> MarkdownExtension {
     MarkdownExtension::inline(Box::new(|input: &str| {
-        delimited(tag("~["), take_until1("]~"), tag("]~"))
+        delimited(tag("~{"), take_until1("}~"), tag("}~"))
             .map(|s| {
                 let s = String::from(s);
                 let mut inners = Vec::new();
