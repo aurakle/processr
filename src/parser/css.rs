@@ -29,19 +29,20 @@ fn make_parser<'src>() -> impl Parser<'src, &'src str, String> {
         any()
             .and_is(just('\'').not())
             .repeated()
-            .collect()
             .padded_by(just('\'')),
         any()
             .and_is(just('\"').not())
             .repeated()
-            .collect()
             .padded_by(just('\"')),
-    ));
+    ))
+        .to_slice()
+        .map(String::from);
 
     escaped
         .or(any()
             .and_is(escaped.not())
             .repeated()
+            .at_least(1)
             .collect::<String>()
             .map(|s| {
                 let mut s = s;
