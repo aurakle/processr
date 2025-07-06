@@ -16,20 +16,20 @@ pub mod extractor;
 #[derive(Debug, clap::Parser)]
 #[command(name = "processr")]
 #[command(about = "Static site generator configured through a Rust macro DSL", long_about = None)]
-struct Cli {
+pub struct Cli {
     #[command(subcommand)]
     pub command: Command,
 }
 
 #[derive(Debug, clap::Subcommand)]
-enum Command {
+pub enum Command {
     Serve(ServeArgs),
     Build(BuildArgs),
 }
 
 #[derive(clap::Args, Debug, Clone)]
 #[command(about = "Build the website and serve it on localhost", long_about = None)]
-struct ServeArgs {
+pub struct ServeArgs {
     #[arg(short, long, default_value_t = 80, help = "The port to serve files on")]
     pub port: u16,
     #[arg(short, long, help = "Clean output directory before building")]
@@ -38,7 +38,7 @@ struct ServeArgs {
 
 #[derive(clap::Args, Debug, Clone)]
 #[command(about = "Build the website", long_about = None)]
-struct BuildArgs {
+pub struct BuildArgs {
     #[arg(short, long, help = "Clean output directory before building")]
     pub clean: bool,
 }
