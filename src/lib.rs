@@ -241,6 +241,7 @@ pub async fn serve(path: &str, port: u16) -> Result<()> {
         .bind(("localhost", port))
         .context("Could not bind to address")?;
 
+    println!("Serving on http://localhost:{}", port);
     server.run().await?;
     Ok(())
 }
