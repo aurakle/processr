@@ -21,6 +21,12 @@ pub struct Cli {
     pub command: Command,
 }
 
+impl Cli {
+    pub fn parse() -> Self {
+        <Cli as clap::Parser>::parse()
+    }
+}
+
 #[derive(Debug, clap::Subcommand)]
 pub enum Command {
     Serve(ServeArgs),
