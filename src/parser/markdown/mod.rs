@@ -38,6 +38,8 @@ impl MarkdownParser {
         let mut config = MarkdownParserConfig::default();
 
         for extension in self.extensions.clone() {
+            //TODO: this will only use the LAST EXTENSION REGISTERED
+            // this must be fixed ASAP
             config = match extension {
                 MarkdownExtension::Inline(func) => config.with_custom_inline_parser(func),
                 MarkdownExtension::Block(func) => config.with_custom_block_parser(func),
@@ -60,8 +62,7 @@ impl ParserProcedure for MarkdownParser {
         })?;
 
         let parser_config = self.configure();
-        let state = MarkdownParserState::default();
-        //TODO: add extensions
+        let state = MarkdownParserState::with_config(parser_config);
         let ast = parse_markdown(state, data.body).map_err(|e| anyhow!("Failed to parse markdown body: {}", e))?;
 
         let printer_config = Config::default();
