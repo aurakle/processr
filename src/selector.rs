@@ -2,10 +2,9 @@ use std::{env, fs, path::{Path, PathBuf}};
 
 use regex::Regex;
 use anyhow::{anyhow, Context, Result};
-use thiserror::Error;
 use wildmatch::WildMatch;
 
-use crate::{procedure::SingleProcedure, Item};
+use crate::{procedure::SingleProcedure, FsError, Item};
 
 #[derive(Clone)]
 pub struct Selector(PathBuf);
@@ -17,11 +16,11 @@ impl SingleProcedure for Selector {
 }
 
 pub fn exact(path: &str) -> Result<Selector> {
-    fs::exists(path).map_err(|e| FindError::IoError(e)).and_then(|b| {
+    fs::exists(path).map_err(|e|FsError::IoError(e)).and_then(|b| {
         if b {
             Ok(Selector(PathBuf::from(path)))
         } else {
-            Err(FindError::FileNotFound)
+            Err(FsError::FileNotFound)
         }
     }).with_context(|| format!("Failed to locate file at '{}'", path))
 }
@@ -60,9 +59,9 @@ where
             let file_name = path
                 .file_name()
                 .map(|os_str| Path::new(os_str))
-                .ok_or(FindError::InvalidFileName)?
+                .ok_or(FsError::InvalidFileName)?
                 .to_str()
-                .ok_or(FindError::OsStringNotUtf8)?;
+                .ok_or(FsError::OsStringNotUtf8)?;
 
             if matcher(file_name) {
                 result.push(path);
@@ -82,13 +81,13 @@ fn resolve_split_path(pat: &str) -> Result<(String, String)> {
         .parent()
         .unwrap_or(&current_dir)
         .to_str()
-        .ok_or(FindError::OsStringNotUtf8)?;
+        .ok_or(FsError::OsStringNotUtf8)?;
     let file_name = path
         .file_name()
         .map(|os_str| Path::new(os_str))
-        .ok_or(FindError::InvalidFileName)?
+        .ok_or(FsError::InvalidFileName)?
         .to_str()
-        .ok_or(FindError::OsStringNotUtf8)?;
+        .ok_or(FsError::OsStringNotUtf8)?;
 
     Ok((base.to_owned(), file_name.to_owned()))
 }
@@ -102,20 +101,4 @@ fn make_selectors_for_paths(paths: Vec<PathBuf>) -> Vec<Selector> {
     }
 
     selectors
-}
-
-#[derive(Error, Debug)]
-enum FindError {
-    #[error(transparent)]
-    RegexError(#[from] regex::Error),
-    #[error("File not found")]
-    FileNotFound,
-    #[error("Not a valid file name")]
-    InvalidFileName,
-    #[error("No valid base file")]
-    InvalidBaseFile,
-    #[error("An OS string is not valid utf-8")]
-    OsStringNotUtf8,
-    #[error(transparent)]
-    IoError(#[from] std::io::Error),
 }

@@ -3,6 +3,7 @@ use actix_files::{Files, NamedFile};
 use actix_web::{web::{self, Data}, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use anyhow::{anyhow, Context, Result};
 use procedure::SingleProcedure;
+use thiserror::Error;
 
 pub extern crate anyhow;
 pub use actix_web;
@@ -101,10 +102,10 @@ impl Item {
         })
     }
 
-    pub fn set_property(&self, key: String, value: Meta) -> Self {
+    pub fn set_property<S: Into<String>, M: Into<Meta>>(&self, key: S, value: M) -> Self {
         let mut properties = self.properties.clone();
 
-        properties.insert(key, value);
+        properties.insert(key.into(), value.into());
 
         Self {
             path: self.path.clone(),
@@ -244,4 +245,20 @@ pub async fn serve(path: &str, port: u16) -> Result<()> {
     println!("Serving on http://localhost:{}", port);
     server.run().await?;
     Ok(())
+}
+
+#[derive(Error, Debug)]
+enum FsError {
+    #[error(transparent)]
+    RegexError(#[from] regex::Error),
+    #[error("File not found")]
+    FileNotFound,
+    #[error("Not a valid file name")]
+    InvalidFileName,
+    #[error("No valid base file")]
+    InvalidBaseFile,
+    #[error("An OS string is not valid utf-8")]
+    OsStringNotUtf8,
+    #[error(transparent)]
+    IoError(#[from] std::io::Error),
 }

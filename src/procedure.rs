@@ -1,10 +1,13 @@
 use std::fs;
+use std::path::Path;
 use std::{env, path::PathBuf};
 
 use anyhow::{bail, Result};
+use time::macros::format_description;
+use time::{format_description, Date, Month};
 use crate::parser::{template::TemplateParser, ParserProcedure};
 
-use crate::selector;
+use crate::{selector, FsError};
 use crate::{selector::Selector, Item, Meta};
 
 pub trait Procedure: Sized + Clone {
@@ -54,6 +57,12 @@ pub trait SingleProcedure: Procedure + Sized + Clone {
         LoadAndApplyTemplate {
             prior: self,
             path: path.into(),
+        }
+    }
+
+    fn load_date(self) -> LoadDate<Self> {
+        LoadDate {
+            prior: self,
         }
     }
 
@@ -231,6 +240,30 @@ pub struct LoadAndApplyTemplate<P: SingleProcedure> {
 impl<P: SingleProcedure> SingleProcedure for LoadAndApplyTemplate<P> {
     fn eval(&self) -> Result<Item> {
         self.prior.clone().apply(selector::exact(&self.path)?).eval()
+    }
+}
+
+#[derive(Clone)]
+pub struct LoadDate<P: SingleProcedure> {
+    prior: P,
+}
+
+impl<P: SingleProcedure> SingleProcedure for LoadDate<P> {
+    fn eval(&self) -> Result<Item> {
+        let item = self.prior.eval()?;
+        let file_name = item.path
+            .file_name()
+            .map(|os_str| Path::new(os_str))
+            .ok_or(FsError::InvalidFileName)?
+            .to_str()
+            .ok_or(FsError::OsStringNotUtf8)?
+            .to_owned();
+
+        let format = format_description!("[year]-[month]-[day]");
+        let mut v = file_name.splitn(4, '-').take(3).collect::<Vec<_>>();
+        let date = Date::parse(v.join("-").as_str(), format)?;
+
+        Ok(item.set_property("date", format!("{}", date)))
     }
 }
 
