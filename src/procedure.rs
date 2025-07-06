@@ -51,7 +51,7 @@ pub trait SingleProcedure: Procedure + Sized + Clone {
 }
 
 pub trait MultiProcedure<P: SingleProcedure>: Procedure + Sized {
-    fn chain<O, F>(&self, func: F) -> impl MultiProcedure<O>
+    fn chain<O, F>(self, func: F) -> impl MultiProcedure<O>
     where
         O: SingleProcedure,
         F: Fn(P) -> O,
@@ -77,7 +77,7 @@ impl<P: SingleProcedure> Procedure for Vec<P> {
 }
 
 impl<P: SingleProcedure> MultiProcedure<P> for Vec<P> {
-    fn chain<O, F>(&self, func: F) -> impl MultiProcedure<O>
+    fn chain<O, F>(self, func: F) -> impl MultiProcedure<O>
     where
         O: SingleProcedure,
         F: Fn(P) -> O,
