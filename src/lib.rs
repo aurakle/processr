@@ -1,7 +1,7 @@
 use std::{collections::HashMap, env, fmt::Display, fs, path::{Path, PathBuf}};
 use actix_files::{Files, NamedFile};
 use actix_web::{web::{self, Data}, App, HttpRequest, HttpResponse, HttpServer, Responder};
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use procedure::SingleProcedure;
 
 pub extern crate anyhow;
@@ -233,9 +233,13 @@ pub async fn serve(path: &str, port: u16) -> Result<()> {
     let path = path.to_owned();
     let server = HttpServer::new(move || {
         App::new()
-            .service(Files::new("/", path.clone()).prefer_utf8(true))
+            .service(Files::new("/", path.clone())
+                .use_hidden_files()
+                .index_file("index.html")
+                .prefer_utf8(true))
     })
-    .bind(("localhost", port))?;
+        .bind(("localhost", port))
+        .context("Could not bind to address")?;
 
     server.run().await?;
     Ok(())
