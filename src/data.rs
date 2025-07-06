@@ -70,6 +70,7 @@ impl SingleProcedure for Item {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
 pub enum Value {
     Map(HashMap<String, Value>),
     List(Vec<Value>),
