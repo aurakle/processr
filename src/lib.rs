@@ -10,9 +10,9 @@ pub mod extractor;
 
 #[macro_export]
 macro_rules! processr {
-    ($out:literal <- $(rule $rules:expr)+) => {
+    ($out:literal <- $(rule $names:ident = $rules:expr)+) => {
         fn main() -> anyhow::Result<()> {
-            $($crate::procedure::Procedure::write(&$rules, $out)?;)+
+            $(let $names = $rules; $crate::procedure::Procedure::write(&$names, $out)?;)+
 
             Ok(())
         }
