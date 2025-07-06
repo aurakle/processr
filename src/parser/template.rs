@@ -3,7 +3,7 @@ use std::{collections::HashMap, env, fs};
 use anyhow::{anyhow, Result};
 use chumsky::{prelude::*, text::{ident, keyword, newline}};
 
-use crate::Meta;
+use crate::data::Value;
 
 use super::ParserProcedure;
 
@@ -17,7 +17,7 @@ impl TemplateParser {
 }
 
 impl ParserProcedure for TemplateParser {
-    fn process(&self, bytes: &Vec<u8>, properties: &HashMap<String, Meta>) -> Result<(Vec<u8>, HashMap<String, Meta>)> {
+    fn process(&self, bytes: &Vec<u8>, properties: &HashMap<String, Value>) -> Result<(Vec<u8>, HashMap<String, Value>)> {
         let text = String::from_utf8(bytes.clone())?;
         let parser = make_parser(properties.clone());
         let text = parser.parse(text.as_str()).into_result().map_err(|_e| anyhow!("Failed to parse markdown"))?;
@@ -26,7 +26,7 @@ impl ParserProcedure for TemplateParser {
     }
 }
 
-fn make_parser<'src>(properties: HashMap<String, Meta>) -> impl Parser<'src, &'src str, String> + Clone {
+fn make_parser<'src>(properties: HashMap<String, Value>) -> impl Parser<'src, &'src str, String> + Clone {
     recursive(move |this| {
         let this1 = this.clone();
         let this2 = this.clone();
@@ -68,7 +68,7 @@ fn make_parser<'src>(properties: HashMap<String, Meta>) -> impl Parser<'src, &'s
             .then_ignore(just("$endfor$"))
             .try_map(move |(key, inner), _span| {
                 let mut result = Vec::new();
-                let list = props2.get(key).map(Meta::as_list).unwrap_or_else(Vec::new);
+                let list = props2.get(key).map(Value::as_list).unwrap_or_else(Vec::new);
 
                 for item in list {
                     result.push(make_parser(item.as_map())
@@ -89,7 +89,7 @@ fn make_parser<'src>(properties: HashMap<String, Meta>) -> impl Parser<'src, &'s
                 .or_not())
             .then_ignore(just("$endif$"))
             .map(move |((key, then), otherwise)| {
-                let s = props3.get(key).and_then(Meta::as_string).unwrap_or_else(String::new);
+                let s = props3.get(key).and_then(Value::as_string).unwrap_or_else(String::new);
 
                 if s.len() != 0 {
                     then
@@ -100,7 +100,7 @@ fn make_parser<'src>(properties: HashMap<String, Meta>) -> impl Parser<'src, &'s
 
         let access = ident()
             .padded_by(just('$'))
-            .map(move |key| props4.get(key).and_then(Meta::as_string).unwrap_or_else(String::new));
+            .map(move |key| props4.get(key).and_then(Value::as_string).unwrap_or_else(String::new));
 
         let element = choice((
             include,
@@ -125,7 +125,7 @@ mod tests {
 
     use chumsky::Parser;
 
-    use crate::Meta;
+    use crate::data::Value;
 
     use super::make_parser;
 
@@ -142,7 +142,7 @@ mod tests {
     #[test]
     fn text_access() {
         let mut props = HashMap::new();
-        props.insert(format!("mrrp"), Meta::from("prrr"));
+        props.insert(format!("mrrp"), Value::from("prrr"));
         let parser = make_parser(props);
         let res = parser.parse("$mrrp$").into_result().unwrap();
         let expected = format!("prrr");
@@ -153,7 +153,7 @@ mod tests {
     #[test]
     fn list_access() {
         let mut props = HashMap::new();
-        props.insert(format!("mrrp"), Meta::from(vec![Meta::from("prrr")]));
+        props.insert(format!("mrrp"), Value::from(vec![Value::from("prrr")]));
         let parser = make_parser(props);
         let res = parser.parse("$mrrp$").into_result().unwrap();
         let expected = format!("prrr");
@@ -165,8 +165,8 @@ mod tests {
     fn map_access() {
         let mut props = HashMap::new();
         let mut map = HashMap::new();
-        map.insert(format!("bwa"), Meta::from("pain"));
-        props.insert(format!("mrrp"), Meta::from(map));
+        map.insert(format!("bwa"), Value::from("pain"));
+        props.insert(format!("mrrp"), Value::from(map));
         let parser = make_parser(props);
         let res = parser.parse("$mrrp$").into_result().unwrap();
         let expected = format!("");
@@ -188,19 +188,19 @@ mod tests {
     fn for_each() {
         let mut props = HashMap::new();
         let mut m1 = HashMap::new();
-        m1.insert(format!("url"), Meta::from("test1"));
-        m1.insert(format!("body"), Meta::from("meow"));
-        m1.insert(format!("field1"), Meta::from("pr"));
+        m1.insert(format!("url"), Value::from("test1"));
+        m1.insert(format!("body"), Value::from("meow"));
+        m1.insert(format!("field1"), Value::from("pr"));
         let mut m2 = HashMap::new();
-        m2.insert(format!("url"), Meta::from("test2"));
-        m2.insert(format!("body"), Meta::from("meow meow"));
-        m2.insert(format!("field1"), Meta::from("prr"));
+        m2.insert(format!("url"), Value::from("test2"));
+        m2.insert(format!("body"), Value::from("meow meow"));
+        m2.insert(format!("field1"), Value::from("prr"));
         let mut m3 = HashMap::new();
-        m3.insert(format!("url"), Meta::from("test3"));
-        m3.insert(format!("body"), Meta::from("meow meow meow"));
-        m3.insert(format!("field1"), Meta::from("prrr"));
-        let l = vec![Meta::from(m1), Meta::from(m2), Meta::from(m3)];
-        props.insert(format!("items"), Meta::from(l));
+        m3.insert(format!("url"), Value::from("test3"));
+        m3.insert(format!("body"), Value::from("meow meow meow"));
+        m3.insert(format!("field1"), Value::from("prrr"));
+        let l = vec![Value::from(m1), Value::from(m2), Value::from(m3)];
+        props.insert(format!("items"), Value::from(l));
         let parser = make_parser(props);
         let res = parser.parse("$for(items)$$url$$body$$field1$$endfor$").into_result().unwrap();
         let expected = format!("test1meowprtest2meow meowprrtest3meow meow meowprrr");
@@ -211,7 +211,7 @@ mod tests {
     #[test]
     fn if_else_true() {
         let mut props = HashMap::new();
-        props.insert(format!("b"), Meta::from("yay"));
+        props.insert(format!("b"), Value::from("yay"));
         let parser = make_parser(props);
         let res = parser.parse("$if(b)$meow$else$prrr$endif$").into_result().unwrap();
         let expected = format!("meow");
@@ -232,7 +232,7 @@ mod tests {
     #[test]
     fn if_true() {
         let mut props = HashMap::new();
-        props.insert(format!("b"), Meta::from("yay"));
+        props.insert(format!("b"), Value::from("yay"));
         let parser = make_parser(props);
         let res = parser.parse("$if(b)$meow$endif$").into_result().unwrap();
         let expected = format!("meow");

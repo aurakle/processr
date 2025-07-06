@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use anyhow::Result;
 use chumsky::{prelude::*, text::newline};
 
-use crate::{Item, Meta};
+use crate::{data::Value, Item};
 
 use super::SingleProcedure;
 
@@ -12,7 +12,7 @@ pub mod template;
 pub mod css;
 
 pub trait ParserProcedure: Clone {
-    fn process(&self, bytes: &Vec<u8>, properties: &HashMap<String, Meta>) -> Result<(Vec<u8>, HashMap<String, Meta>)>;
+    fn process(&self, bytes: &Vec<u8>, properties: &HashMap<String, Value>) -> Result<(Vec<u8>, HashMap<String, Value>)>;
 }
 
 fn whitespace<'src>() -> impl Parser<'src, &'src str, ()> + Clone {

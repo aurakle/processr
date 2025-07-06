@@ -4,7 +4,7 @@ use regex::Regex;
 use anyhow::{anyhow, Context, Result};
 use wildmatch::WildMatch;
 
-use crate::{procedure::SingleProcedure, FsError, Item};
+use crate::{error::FsError, procedure::SingleProcedure, Item};
 
 #[derive(Clone)]
 pub struct Selector(PathBuf);

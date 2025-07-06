@@ -6,10 +6,12 @@ use anyhow::{bail, Result};
 use time::formatting::Formattable;
 use time::macros::format_description;
 use time::{format_description, Date, Month};
+use crate::data::Value;
+use crate::error::FsError;
 use crate::parser::{template::TemplateParser, ParserProcedure};
 
-use crate::{selector, FsError};
-use crate::{selector::Selector, Item, Meta};
+use crate::{selector};
+use crate::{selector::Selector, Item};
 
 pub trait Procedure: Sized + Clone {
     fn write(&self, out: &str) -> Result<()>;
@@ -18,7 +20,7 @@ pub trait Procedure: Sized + Clone {
 pub trait SingleProcedure: Procedure + Sized + Clone {
     fn eval(&self) -> Result<Item>;
 
-    fn property<S: Into<String>>(self, key: S, value: Meta) -> SetProperty<Self> {
+    fn property<S: Into<String>>(self, key: S, value: Value) -> SetProperty<Self> {
         SetProperty {
             prior: self,
             key: key.into(),
@@ -87,7 +89,7 @@ pub trait MultiProcedure<P: SingleProcedure>: Procedure + Sized + Clone {
         F: Fn(P) -> O,
     ;
 
-    fn into_meta(&self) -> Result<Meta>;
+    fn into_meta(&self) -> Result<Value>;
 }
 
 impl<P: SingleProcedure> Procedure for P {
@@ -121,14 +123,14 @@ impl<P: SingleProcedure> MultiProcedure<P> for Vec<P> {
         result
     }
 
-    fn into_meta(&self) -> Result<Meta> {
+    fn into_meta(&self) -> Result<Value> {
         let mut result = Vec::new();
 
         for p in self {
            result.push(p.eval()?.into_meta()?);
         }
 
-        Ok(Meta::from(result))
+        Ok(Value::from(result))
     }
 }
 
@@ -136,7 +138,7 @@ impl<P: SingleProcedure> MultiProcedure<P> for Vec<P> {
 pub struct SetProperty<P: SingleProcedure> {
     prior: P,
     key: String,
-    value: Meta,
+    value: Value,
 }
 
 impl<P: SingleProcedure> SingleProcedure for SetProperty<P> {

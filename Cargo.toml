@@ -9,9 +9,12 @@ actix-web = "4.11.0"
 anyhow = "1.0.98"
 chumsky = "0.10.1"
 clap = { version = "4.5.40", features = ["derive"] }
+fronma = "0.2.0"
 html-escape = "0.2.13"
+markdown-ppp = "2.0.1"
 rand = "0.9.1"
 regex = "1.11.1"
+serde = { version = "1.0.219", features = ["derive"] }
 thiserror = "2.0.12"
 time = "0.3.41"
 wildmatch = "2.4.0"

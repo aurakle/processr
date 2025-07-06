@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use anyhow::{Result, anyhow};
 use chumsky::prelude::*;
 
-use crate::Meta;
+use crate::data::Value;
 
 use super::ParserProcedure;
 
@@ -16,7 +16,7 @@ impl CssCompressor {
 }
 
 impl ParserProcedure for CssCompressor {
-    fn process(&self, bytes: &Vec<u8>, properties: &HashMap<String, Meta>) -> Result<(Vec<u8>, HashMap<String, Meta>)> {
+    fn process(&self, bytes: &Vec<u8>, properties: &HashMap<String, Value>) -> Result<(Vec<u8>, HashMap<String, Value>)> {
         let input = String::from_utf8(bytes.clone())?;
         let output = make_parser().parse(input.as_str()).into_result().map_err(|_e| anyhow!("Failed to parse css"))?;
 
