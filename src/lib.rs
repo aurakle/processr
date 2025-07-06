@@ -57,7 +57,7 @@ macro_rules! processr {
             match $crate::Cli::parse().command {
                 $crate::Command::Serve(args) => {
                     build(args.clean)?;
-                    $crate::serve($out, args.port)
+                    $crate::serve($out, args.port).await
                 },
                 $crate::Command::Build(args) => {
                     build(args.clean)
