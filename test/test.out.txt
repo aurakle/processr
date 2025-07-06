@@ -1,5 +1,4 @@
 <h1>Headers</h1><h1>Header1</h1><h2>Header2</h2><h3>Header2</h3><small>small</small><h1>Styling</h1><i>italics</i><br/><b>bold</b><br/><s>strikethrough</s><br/><u>underscore</u><br/><h1>Code</h1><code>code line</code><br/><pre><code>
 code block
-</code></pre><br/><pre><code>json
-code block with json
+</code></pre><br/><pre><code class="language-json">code block with json
 </code></pre><br/><h1>Lists</h1>1. Ordered2. Lists<br/>- Unordered- Lists<br/><h1>Links</h1><a href="https://with.text.and.link">with text and link</a><br/><a href="https://without.text"></a><br/><a href="https://without.link">without link</a><br/><a href=""></a><br/><img src="https://embed.image.with.alt" alt="embed image with alt"/><br/><img src="https://embed.image.without.alt" alt=""/><br/><img src="" alt="missing image embed"/><br/><img src="" alt=""/><br/><h1>Escape character</h1>*italics*<br/>**bold**<br/>~~strikethrough~~<br/>__underscore__<br/><h1>Quotes</h1>> Some quoted plain text<br/>> <i>Some</i> <b>quoted</b> <s>styled</s> <u>text</u><br/>> <h1>Some</h1>> <h2>Quoted</h2>> <h2>Headers</h2>

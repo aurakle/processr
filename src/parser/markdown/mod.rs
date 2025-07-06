@@ -110,12 +110,20 @@ fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src
                     .map(|s| format!("<p>{}</p>", s)),
             just("\n\n").to(format!("<br/>")),
             just('\n').to(format!("")),
-            any()
-                .and_is(just("```").not())
-                .repeated()
-                .to_slice()
-                .padded_by(just("```"))
-                .map(|inner| format!("<pre><code>{}</code></pre>", html_escape::encode_safe(inner))),
+            just("```")
+                .ignore_then(ident().then_ignore(just('\n')).or_not())
+                .then(any()
+                    .and_is(just("```").not())
+                    .repeated()
+                    .to_slice())
+                .then_ignore(just("```"))
+                .map(|(lang, inner)| {
+                    let inner = html_escape::encode_safe(inner);
+                    match lang {
+                        Some(lang) => format!("<pre><code class=\"language-{}\">{}</code></pre>", lang, inner),
+                        None => format!("<pre><code>{}</code></pre>", inner),
+                    }
+                }),
             any()
                 .and_is(just('`').not())
                 .repeated()
@@ -285,6 +293,22 @@ mod tests {
         }
 
         #[test]
+        fn code_block() {
+            let res = element(&extension::default()).parse("```meow```").into_result().unwrap();
+            let expected = format!("<pre><code>meow</code></pre>");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
+        fn code_block_with_lang() {
+            let res = element(&extension::default()).parse("```rs\nmeow```").into_result().unwrap();
+            let expected = format!("<pre><code class=\"language-rs\">meow</code></pre>");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
         fn strikethrough() {
             let res = element(&extension::default()).parse("~~meow~~").into_result().unwrap();
             let expected = format!("<s>meow</s>");
@@ -424,6 +448,22 @@ mod tests {
         fn code() {
             let res = document(&extension::default()).parse("meow`meow`meow").into_result().unwrap();
             let expected = format!("meow<code>meow</code>meow");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
+        fn code_block() {
+            let res = document(&extension::default()).parse("meow```meow```meow").into_result().unwrap();
+            let expected = format!("meow<pre><code>meow</code></pre>meow");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
+        fn code_block_with_lang() {
+            let res = document(&extension::default()).parse("meow```rs\nmeow```meow").into_result().unwrap();
+            let expected = format!("meow<pre><code class=\"language-rs\">meow</code></pre>meow");
 
             assert_eq!(expected, res);
         }
