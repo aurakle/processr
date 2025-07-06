@@ -1,5 +1,5 @@
 use std::{collections::HashMap, env, fmt::Display, fs, path::{Path, PathBuf}};
-use actix_files::NamedFile;
+use actix_files::{Files, NamedFile};
 use actix_web::{web::{self, Data}, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use anyhow::{Result, anyhow};
 use procedure::SingleProcedure;
@@ -225,24 +225,14 @@ pub fn clean(path: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn serve(path: &str, port: u16) -> Result<()> {
+pub async fn serve(path: &str, port: u16) -> Result<()> {
     let path = path.to_owned();
     let server = HttpServer::new(move || {
         App::new()
-            .app_data(Data::new(PathBuf::from(path.clone())))
-            .service(file)
+            .service(Files::new("/", path.clone()).prefer_utf8(true))
     })
     .bind(("localhost", port))?;
 
-    server.run();
+    server.run().await?;
     Ok(())
-}
-
-#[actix_web::get("/{other_url:.*}")]
-async fn file(req: HttpRequest, root: Data<PathBuf>) -> impl Responder {
-    let file = root.join(req.path());
-    match NamedFile::open_async(file).await {
-        Ok(res) => res.respond_to(&req),
-        Err(_) => HttpResponse::InternalServerError().finish(),
-    }
 }

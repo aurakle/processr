@@ -50,8 +50,11 @@ pub trait SingleProcedure: Procedure + Sized + Clone {
         }
     }
 
-    fn load_and_apply(self, path: &str) -> Result<ApplyTemplate<Self, Selector>> {
-        Ok(self.apply(selector::exact(path)?))
+    fn load_and_apply<S: Into<String>>(self, path: S) -> LoadAndApplyTemplate<Self> {
+        LoadAndApplyTemplate {
+            prior: self,
+            path: path.into(),
+        }
     }
 
     fn map<F>(self, func: F) -> Map<Self, F>
@@ -216,6 +219,18 @@ impl<P: SingleProcedure, T: SingleProcedure> SingleProcedure for ApplyTemplate<P
             bytes,
             properties,
         })
+    }
+}
+
+#[derive(Clone)]
+pub struct LoadAndApplyTemplate<P: SingleProcedure> {
+    prior: P,
+    path: String,
+}
+
+impl<P: SingleProcedure> SingleProcedure for LoadAndApplyTemplate<P> {
+    fn eval(&self) -> Result<Item> {
+        self.prior.clone().apply(selector::exact(&self.path)?).eval()
     }
 }
 
