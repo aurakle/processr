@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use markdown_ppp::ast::{Block, Inline};
-use nom::{bytes::{tag, take_until1}, sequence::delimited, IResult, Parser};
+use nom::{bytes::complete::{tag, take_until1}, sequence::delimited, IResult, Parser};
 use rand::Rng;
 
 pub type InlineExtensionFn = Rc<RefCell<Box<dyn for<'a> FnMut(&'a str) -> IResult<&'a str, Vec<Inline>>>>>;
