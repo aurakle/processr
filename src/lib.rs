@@ -6,7 +6,6 @@ use procedure::SingleProcedure;
 
 pub extern crate anyhow;
 pub extern crate actix_web;
-pub extern crate env_logger;
 
 pub mod prelude;
 pub mod parser;
@@ -49,11 +48,6 @@ macro_rules! processr {
     ($out:literal <- $($names:ident $rules:expr)+) => {
         #[$crate::actix_web::main]
         fn main() -> $crate::anyhow::Result<()> {
-            $crate::env_logger::Builder::from_default_env()
-                .target($crate::env_logger::Target::Stdout)
-                .filter_level($crate::env_logger::LevelFilter::Info)
-                .init();
-
             match $crate::Cli::parse().command {
                 $crate::Command::Serve(args) => {
                     build(args.clean)?;

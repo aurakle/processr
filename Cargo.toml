@@ -9,7 +9,6 @@ actix-web = "4.11.0"
 anyhow = "1.0.98"
 chumsky = "0.10.1"
 clap = { version = "4.5.40", features = ["derive"] }
-env_logger = "0.11.8"
 html-escape = "0.2.13"
 rand = "0.9.1"
 regex = "1.11.1"
