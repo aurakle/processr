@@ -34,7 +34,7 @@ pub fn wobbly() -> MarkdownExtension {
                     inners.push(recursive_wobble(c));
                 }
 
-                vec![Inline::Text(format!("<span aria-label=\"{}\"><style scoped>@keyframes spin {{ 100% {{ transform: rotate(360deg); }} }}</style>{}</span>", s, inners.concat()))]
+                vec![Inline::Html(format!("<span aria-label=\"{}\"><style scoped>@keyframes spin {{ 100% {{ transform: rotate(360deg); }} }}</style>{}</span>", s, inners.concat()))]
             })
             .parse(input)
     }))
