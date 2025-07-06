@@ -5,7 +5,7 @@ use anyhow::{Result, anyhow};
 use procedure::SingleProcedure;
 
 pub extern crate anyhow;
-pub extern crate actix_web;
+pub use actix_web;
 
 pub mod prelude;
 pub mod parser;
@@ -52,9 +52,7 @@ pub struct BuildArgs {
 #[macro_export]
 macro_rules! processr {
     ($out:literal <- $($names:ident $rules:expr)+) => {
-        use $crate::actix_web;
-
-        #[actix_web::main]
+        #[$crate::actix_web::main]
         async fn main() -> $crate::anyhow::Result<()> {
             match $crate::Cli::parse().command {
                 $crate::Command::Serve(args) => {
