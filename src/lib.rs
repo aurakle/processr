@@ -15,7 +15,7 @@ pub mod extractor;
 #[command(about = "Static site generator configured through a Rust macro DSL", long_about = None)]
 struct Cli {
     #[command(subcommand)]
-    command: Command,
+    pub command: Command,
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -28,16 +28,16 @@ enum Command {
 #[command(about = "Build the website and serve it on localhost", long_about = None)]
 struct ServeArgs {
     #[arg(short, long, default_value_t = 80, help = "The port to serve files on")]
-    port: u16,
+    pub port: u16,
     #[arg(short, long, help = "Clean output directory before building")]
-    clean: bool,
+    pub clean: bool,
 }
 
 #[derive(clap::Args, Debug, Clone)]
 #[command(about = "Build the website", long_about = None)]
 struct BuildArgs {
     #[arg(short, long, help = "Clean output directory before building")]
-    clean: bool,
+    pub clean: bool,
 }
 
 #[macro_export]
@@ -53,10 +53,10 @@ macro_rules! processr {
             match $crate::Cli::parse().command {
                 $crate::Command::Serve(args) => {
                     build(args.clean)?;
-                    $crate::serve($out, args.port)?;
+                    $crate::serve($out, args.port)
                 },
                 $crate::Command::Build(args) => {
-                    build(args.clean)?;
+                    build(args.clean)
                 }
             }
         }
