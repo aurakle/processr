@@ -62,4 +62,7 @@ fn make_parser<'src>() -> impl Parser<'src, &'src str, String> {
 
                 s
             }))
+        .repeated()
+        .collect::<Vec<String>>()
+        .map(|v| v.concat())
 }
