@@ -38,11 +38,17 @@ impl MarkdownParser {
 impl ParserProcedure for MarkdownParser {
     fn process(&self, bytes: &Vec<u8>, properties: &HashMap<String, Value>) -> Result<(Vec<u8>, HashMap<String, Value>)> {
         let text = String::from_utf8(bytes.clone())?;
-        let data = parse::<HashMap<String, Value>>(&text).map_err(|e| anyhow!("Failed to parse markdown frontmatter"))?;
+        let data = parse::<HashMap<String, Value>>(&text).map_err(|e| {
+            match e {
+                fronma::error::Error::MissingBeginningLine => anyhow!("Markdown document is missing frontmatter"),
+                fronma::error::Error::MissingEndingLine => anyhow!("Frontmatter is missing closing triple dash"),
+                fronma::error::Error::SerdeYaml(e) => anyhow!("Failed to parse YAML frontmatter: {}", e),
+            }
+        })?;
         let config = Config::default();
         let state = MarkdownParserState::default();
         //TODO: add extensions
-        let ast = parse_markdown(state, data.body).map_err(|e| anyhow!("Failed to parse markdown body"))?;
+        let ast = parse_markdown(state, data.body).map_err(|e| anyhow!("Failed to parse markdown body: {}", e))?;
 
         Ok((render_html(&ast, config).as_bytes().to_vec(), data.headers))
     }
