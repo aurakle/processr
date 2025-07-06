@@ -61,7 +61,7 @@ pub trait SingleProcedure: Procedure + Sized + Clone {
         }
     }
 
-    fn load_date<F: Formattable + Clone>(self, format: F) -> LoadDate<Self, F> {
+    fn load_date(self, format: &'static [time::format_description::BorrowedFormatItem<'static>]) -> LoadDate<Self> {
         LoadDate {
             prior: self,
             format
@@ -246,12 +246,12 @@ impl<P: SingleProcedure> SingleProcedure for LoadAndApplyTemplate<P> {
 }
 
 #[derive(Clone)]
-pub struct LoadDate<P: SingleProcedure, F: Formattable + Clone> {
+pub struct LoadDate<P: SingleProcedure> {
     prior: P,
-    format: F,
+    format: &'static [time::format_description::BorrowedFormatItem<'static>],
 }
 
-impl<P: SingleProcedure, F: Formattable + Clone> SingleProcedure for LoadDate<P, F> {
+impl<P: SingleProcedure> SingleProcedure for LoadDate<P> {
     fn eval(&self) -> Result<Item> {
         let item = self.prior.eval()?;
         let file_name = item.path
@@ -265,7 +265,7 @@ impl<P: SingleProcedure, F: Formattable + Clone> SingleProcedure for LoadDate<P,
         let parse_format = format_description!("[year]-[month]-[day]");
         let mut v = file_name.splitn(4, '-').take(3).collect::<Vec<_>>();
         let date = Date::parse(v.join("-").as_str(), parse_format)?;
-        Ok(item.set_property("date", date.format(&self.format)?))
+        Ok(item.set_property("date", date.format(self.format)?))
     }
 }
 
