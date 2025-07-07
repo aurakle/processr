@@ -45,8 +45,7 @@ impl ParserProcedure for MarkdownParser {
             }
         })?;
 
-        let body = format!("\n{}", data.body);
-        let res = make_parser(self.extensions.clone()).parse(&body).into_result().map_err(|_e| anyhow!("Failed to parse markdown"))?;
+        let res = make_parser(self.extensions.clone()).parse(data.body).into_result().map_err(|_e| anyhow!("Failed to parse markdown"))?;
         let mut properties = properties.clone();
 
         properties.extend(data.headers);
@@ -73,6 +72,36 @@ fn element<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src 
             just("\\")
                 .ignore_then(any()
                     .map(|c| format!("{}", c))),
+            // headers
+            just("\n# ")
+                .ignore_then(any()
+                    .and_is(just('\n').not())
+                    .repeated()
+                    .collect()
+                    .try_map(closure.clone()))
+                    .map(|s| format!("<h1>{}</h1>", s)),
+            just("\n## ")
+                .ignore_then(any()
+                    .and_is(just('\n').not())
+                    .repeated()
+                    .collect()
+                    .try_map(closure.clone()))
+                    .map(|s| format!("<h2>{}</h2>", s)),
+            just("\n### ")
+                .ignore_then(any()
+                    .and_is(just('\n').not())
+                    .repeated()
+                    .collect()
+                    .try_map(closure.clone()))
+                    .map(|s| format!("<h3>{}</h3>", s)),
+            just("\n-# ")
+                .ignore_then(any()
+                    .and_is(just('\n').not())
+                    .repeated()
+                    .collect()
+                    .try_map(closure.clone()))
+                    .map(|s| format!("<small>{}</small>", s)),
+            // paragraphs
             just("\n\n\n")
                 .ignore_then(any()
                     .and_is(just("\n\n\n").not())
@@ -81,7 +110,9 @@ fn element<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src 
                     .collect()
                     .try_map(closure.clone()))
                     .map(|s| format!("<p>{}</p>", s)),
+            // line breaks
             just("\n\n").to(format!("<br/>")),
+            // manual wrapping
             just('\n').to(format!("")),
             // code block
             just("```")
