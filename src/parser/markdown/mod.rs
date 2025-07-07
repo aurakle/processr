@@ -56,7 +56,6 @@ impl ParserProcedure for MarkdownParser {
 
 fn make_parser<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
     block(extensions.clone())
-        .or(inline(extensions))
         .repeated()
         .collect::<Vec<String>>()
         .map(|elements| elements.concat())
@@ -66,10 +65,24 @@ fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src st
     let extensions1 = extensions.clone();
     let extensions2 = extensions.clone();
     let block_closure = move |inner: String, _span| {
-        inline(extensions1.clone()).parse(inner.as_ref()).into_result().map_err(|_e| EmptyErr::default())
+        inline(extensions1.clone())
+            .repeated()
+            .at_least(1)
+            .collect::<Vec<String>>()
+            .map(|elements| elements.concat())
+            .parse(inner.as_ref())
+            .into_result()
+            .map_err(|_e| EmptyErr::default())
     };
     let inline_closure = move |inner: String, _span| {
-        inline(extensions2.clone()).parse(inner.as_ref()).into_result().map_err(|_e| EmptyErr::default())
+        inline(extensions2.clone())
+            .repeated()
+            .at_least(1)
+            .collect::<Vec<String>>()
+            .map(|elements| elements.concat())
+            .parse(inner.as_ref())
+            .into_result()
+            .map_err(|_e| EmptyErr::default())
     };
     let mut block = just('\n')
         .ignore_then(choice((
