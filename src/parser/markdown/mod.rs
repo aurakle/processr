@@ -67,49 +67,50 @@ fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src st
     let closure = move |inner: String, _span| {
         inline(extensions1.clone()).parse(inner.as_ref()).into_result().map_err(|_e| EmptyErr::default())
     };
-    let mut block = just("\n\n\n")
-        .ignore_then(any()
-            .and_is(just("\n\n\n").not())
-            .repeated()
-            .at_least(1)
-            .collect()
-            .try_map(closure.clone()))
-            .map(|s| format!("<p>{}</p>", s))
-        .or(choice((
-            // headers
-            //match
-            just("# ")
-                .ignore_then(any()
-                    .and_is(just('\n').not())
-                    .repeated()
-                    .collect()
-                    .try_map(closure.clone()))
-                    .map(|s| format!("<h1>{}</h1>", s)),
-            just("## ")
-                .ignore_then(any()
-                    .and_is(just('\n').not())
-                    .repeated()
-                    .collect()
-                    .try_map(closure.clone()))
-                    .map(|s| format!("<h2>{}</h2>", s)),
-            just("### ")
-                .ignore_then(any()
-                    .and_is(just('\n').not())
-                    .repeated()
-                    .collect()
-                    .try_map(closure.clone()))
-                    .map(|s| format!("<h3>{}</h3>", s)),
-            just("-# ")
-                .ignore_then(any()
-                    .and_is(just('\n').not())
-                    .repeated()
-                    .collect()
-                    .try_map(closure.clone()))
-                    .map(|s| format!("<br/><small>{}</small>", s)),
-            inline(extensions.clone()),
-        )).padded_by(just('\n')));
+    let mut block = choice((
+        // headers
+        just("# ")
+            .ignore_then(any()
+                .and_is(just('\n').not())
+                .repeated()
+                .collect()
+                .try_map(closure.clone()))
+                .map(|s| format!("<h1>{}</h1>", s)),
+        just("## ")
+            .ignore_then(any()
+                .and_is(just('\n').not())
+                .repeated()
+                .collect()
+                .try_map(closure.clone()))
+                .map(|s| format!("<h2>{}</h2>", s)),
+        just("### ")
+            .ignore_then(any()
+                .and_is(just('\n').not())
+                .repeated()
+                .collect()
+                .try_map(closure.clone()))
+                .map(|s| format!("<h3>{}</h3>", s)),
+        just("-# ")
+            .ignore_then(any()
+                .and_is(just('\n').not())
+                .repeated()
+                .collect()
+                .try_map(closure.clone()))
+                .map(|s| format!("<br/><small>{}</small>", s)),
+    )).padded_by(just('\n'));
 
-    block
+    choice((
+        block,
+        just("\n\n\n")
+            .ignore_then(any()
+                .and_is(just("\n\n\n").not())
+                .repeated()
+                .at_least(1)
+                .collect()
+                .try_map(closure.clone()))
+                .map(|s| format!("<p>{}</p>", s)),
+        inline(extensions),
+    ))
 }
 
 fn inline<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
@@ -292,6 +293,15 @@ mod tests {
             let p = block(vec![]);
             let res = p.parse("\n-# meow\n").into_result().unwrap();
             let expected = format!("<br/><small>meow</small>");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
+        fn paragraph() {
+            let p = block(vec![]);
+            let res = p.parse("\n\n\nmeow").into_result().unwrap();
+            let expected = format!("<p>meow</p>");
 
             assert_eq!(expected, res);
         }

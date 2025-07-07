@@ -56,6 +56,8 @@ macro_rules! processr {
     ($out:literal <- $($names:ident $rules:expr)+) => {
         #[::processr::actix_web::rt::main(system = "::processr::actix_web::rt::System")]
         async fn main() -> $crate::anyhow::Result<()> {
+            fs::create_dir_all($out);
+
             match $crate::Cli::parse().command {
                 $crate::Command::Serve(args) => {
                     build(args.clean)?;
