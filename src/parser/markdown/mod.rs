@@ -108,8 +108,6 @@ fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src st
                 .collect()
                 .try_map(closure.clone()))
                 .map(|s| format!("<p>{}</p>", s)),
-        // line breaks
-        just("\n\n").to(format!("<br/>")),
         inline(extensions.clone()),
     )).padded_by(just('\n'));
 
@@ -127,6 +125,8 @@ fn inline<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src s
         just("\\")
             .ignore_then(any()
                 .map(|c| format!("{}", c))),
+        // line breaks
+        just("\n\n").to(format!("<br/>")),
         // manual wrapping
         just('\n').to(format!("")),
         // image
@@ -247,7 +247,12 @@ fn inline<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src s
             .map(|inner| format!("<u>{}</u>", inner)),
     ));
 
-    inline.clone().or(any().and_is(inline.not()).and_is(just('\n').not()).repeated().at_least(1).collect())
+    inline.clone()
+        .or(none_of("\n")
+            .and_is(inline.not())
+            .repeated()
+            .at_least(1)
+            .collect())
 }
 
 #[cfg(test)]
