@@ -152,10 +152,10 @@ fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src
                 .map(|inner| format!("<b>{}</b>", inner)),
             // italic
             any()
-                .and_is(just('*').not())
+                .and_is(just('*').and_is(just("**").not()).not())
                 .repeated()
                 .to_slice()
-                .padded_by(just('*'))
+                .padded_by(just('*').and_is(just("**").not()))
                 .map(|inner| format!("<i>{}</i>", inner)),
         ));
 
