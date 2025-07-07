@@ -79,6 +79,7 @@ fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src
             //         .map(|s| format!("<p>{}</p>", s)),
             // just("\n\n").to(format!("<br/>")),
             // just('\n').to(format!("")),
+            // code block
             just("```")
                 .ignore_then(ident().then_ignore(just('\n')).or_not())
                 .then(any()
@@ -93,12 +94,14 @@ fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src
                         None => format!("<pre><code>{}</code></pre>", inner),
                     }
                 }),
+            // code line
             any()
                 .and_is(just('`').not())
                 .repeated()
                 .to_slice()
                 .padded_by(just('`'))
                 .map(|inner| format!("<code>{}</code>", html_escape::encode_safe(inner))),
+            // image
             just('!')
                 .ignore_then(
                     group((
@@ -120,6 +123,7 @@ fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src
                 .map(|(text, link)| {
                     format!("<img src=\"{}\" alt=\"{}\"/>", link.unwrap_or_else(String::new), text.unwrap_or_else(String::new))
                 }),
+            // link
             group((
                 any()
                     .and_is(just(']').not())
@@ -139,6 +143,20 @@ fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src
                 .map(|(text, link)| {
                     format!("<a href=\"{}\">{}</a>", link.unwrap_or_else(String::new), text.unwrap_or_else(String::new))
                 }),
+            // bold
+            any()
+                .and_is(just("**").not())
+                .repeated()
+                .to_slice()
+                .padded_by(just("**"))
+                .map(|inner| format!("<b>{}</b>", inner)),
+            // italic
+            any()
+                .and_is(just('*').not())
+                .repeated()
+                .to_slice()
+                .padded_by(just('*'))
+                .map(|inner| format!("<i>{}</i>", inner)),
         ));
 
         for extension in extensions {
