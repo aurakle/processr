@@ -1,7 +1,7 @@
 use std::{collections::HashMap, env, fs};
 
 use anyhow::{anyhow, Result};
-use chumsky::{prelude::*, text::{ident, keyword, newline}};
+use chumsky::{prelude::*, text::{ident, keyword}};
 
 use crate::data::Value;
 

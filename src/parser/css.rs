@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use chumsky::prelude::*;
 
 use crate::data::Value;

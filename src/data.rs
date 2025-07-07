@@ -1,6 +1,6 @@
 use std::{collections::HashMap, env, fs, path::PathBuf};
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use serde::Deserialize;
 
 use crate::prelude::SingleProcedure;

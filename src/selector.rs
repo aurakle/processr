@@ -1,7 +1,7 @@
 use std::{env, fs, path::{Path, PathBuf}};
 
 use regex::Regex;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use wildmatch::WildMatch;
 
 use crate::{error::FsError, procedure::SingleProcedure, Item};

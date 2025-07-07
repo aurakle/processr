@@ -1,13 +1,13 @@
-use std::{collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
-use chumsky::{prelude::*, text::{ident, keyword, newline}};
+use chumsky::{prelude::*, text::ident};
 use extension::MarkdownExtension;
 use fronma::parser::parse;
 
 use crate::data::Value;
 
-use super::{whitespace, ParserProcedure};
+use super::ParserProcedure;
 
 pub mod extension;
 
@@ -45,7 +45,7 @@ impl ParserProcedure for MarkdownParser {
             }
         })?;
 
-        let res = make_parser(self.extensions.clone()).parse(data.body).into_result().map_err(|_e| anyhow!("Failed to parse markdown"))?;
+        let res = make_parser(&self.extensions).parse(data.body).into_result().map_err(|_e| anyhow!("Failed to parse markdown"))?;
         let mut properties = properties.clone();
 
         properties.extend(data.headers);
@@ -54,12 +54,18 @@ impl ParserProcedure for MarkdownParser {
     }
 }
 
-fn make_parser<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
-    block(extensions.clone())
-        .or(inline(extensions))
+fn make_parser<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
+    element(extensions)
         .repeated()
         .collect::<Vec<String>>()
         .map(|elements| elements.concat())
+}
+
+fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
+    choice((
+        inline(extensions.clone()),
+        block(extensions.clone()),
+    ))
 }
 
 fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
@@ -120,6 +126,7 @@ fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src st
 
     choice((
         block,
+        // paragraph
         just("\n\n\n")
             .ignore_then(any()
                 .and_is(just("\n\n\n").not())
@@ -128,7 +135,7 @@ fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src st
                 .collect()
                 .try_map(block_closure.clone()))
                 .map(|s| format!("<p>{}</p>", s)),
-        // line breaks
+        // line break
         just("\n\n").to(format!("<br/>")),
     ))
 }
@@ -146,13 +153,6 @@ fn inline<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src s
             .map_err(|_e| EmptyErr::default())
     };
     let mut inline = choice((
-        // escape char
-        // TODO: should this be moved to a different parser?
-        just("\\")
-            .ignore_then(any()
-                .map(|c| format!("{}", c))),
-        // manual wrapping
-        just('\n').to(format!("")),
         // image
         just('!')
             .ignore_then(
@@ -271,12 +271,21 @@ fn inline<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src s
             .map(|inner| format!("<u>{}</u>", inner)),
     ));
 
-    inline.clone()
-        .or(none_of("\n")
-            .and_is(inline.not())
+    choice((
+        // escape char
+        just("\\")
+            .ignore_then(any()
+                .map(|c| format!("{}", c))),
+        // manual wrapping
+        just('\n').to(format!("")),
+        inline.clone(),
+        none_of("\n")
+            //TODO: cursed recursive
+            .and_is(element.not())
             .repeated()
             .at_least(1)
-            .collect())
+            .collect(),
+    ))
 }
 
 #[cfg(test)]

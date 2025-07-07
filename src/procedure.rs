@@ -1,17 +1,15 @@
-use std::fs;
 use std::path::Path;
 use std::{env, path::PathBuf};
 
 use anyhow::{bail, Result};
-use time::formatting::Formattable;
 use time::macros::format_description;
-use time::{format_description, Date, Month};
+use time::{format_description, Date};
 use crate::data::Value;
 use crate::error::FsError;
 use crate::parser::{template::TemplateParser, ParserProcedure};
 
-use crate::{selector};
-use crate::{selector::Selector, Item};
+use crate::selector;
+use crate::Item;
 
 pub trait Procedure: Sized + Clone {
     fn write(&self, out: &str) -> Result<()>;

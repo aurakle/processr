@@ -1,9 +1,8 @@
-use std::{collections::HashMap, env, fmt::Display, fs, path::{Path, PathBuf}};
-use actix_files::{Files, NamedFile};
-use actix_web::{web::{self, Data}, App, HttpRequest, HttpResponse, HttpServer, Responder};
-use anyhow::{anyhow, Context, Result};
+use std::{collections::HashMap, env, fs, path::PathBuf};
+use actix_files::Files;
+use actix_web::{App, HttpServer};
+use anyhow::{Context, Result};
 use data::Item;
-use procedure::SingleProcedure;
 
 pub extern crate anyhow;
 pub use actix_web;
