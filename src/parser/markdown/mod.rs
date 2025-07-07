@@ -67,49 +67,47 @@ fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src st
     let closure = move |inner: String, _span| {
         inline(extensions1.clone()).parse(inner.as_ref()).into_result().map_err(|_e| EmptyErr::default())
     };
-    let mut block = choice((
-        // headers
-        //TODO: headers, due to requiring a newline, don't behave well when the other parsers
-        //match
-        just("# ")
-            .ignore_then(any()
-                .and_is(just('\n').not())
-                .repeated()
-                .collect()
-                .try_map(closure.clone()))
-                .map(|s| format!("<h1>{}</h1>", s)),
-        just("## ")
-            .ignore_then(any()
-                .and_is(just('\n').not())
-                .repeated()
-                .collect()
-                .try_map(closure.clone()))
-                .map(|s| format!("<h2>{}</h2>", s)),
-        just("### ")
-            .ignore_then(any()
-                .and_is(just('\n').not())
-                .repeated()
-                .collect()
-                .try_map(closure.clone()))
-                .map(|s| format!("<h3>{}</h3>", s)),
-        just("-# ")
-            .ignore_then(any()
-                .and_is(just('\n').not())
-                .repeated()
-                .collect()
-                .try_map(closure.clone()))
-                .map(|s| format!("<br/><small>{}</small>", s)),
-        // paragraphs
-        just("\n\n")
-            .ignore_then(any()
-                .and_is(just("\n\n").not())
-                .repeated()
-                .at_least(1)
-                .collect()
-                .try_map(closure.clone()))
-                .map(|s| format!("<p>{}</p>", s)),
-        inline(extensions.clone()),
-    )).padded_by(just('\n'));
+    let mut block = just("\n\n\n")
+        .ignore_then(any()
+            .and_is(just("\n\n\n").not())
+            .repeated()
+            .at_least(1)
+            .collect()
+            .try_map(closure.clone()))
+            .map(|s| format!("<p>{}</p>", s))
+        .or(choice((
+            // headers
+            //match
+            just("# ")
+                .ignore_then(any()
+                    .and_is(just('\n').not())
+                    .repeated()
+                    .collect()
+                    .try_map(closure.clone()))
+                    .map(|s| format!("<h1>{}</h1>", s)),
+            just("## ")
+                .ignore_then(any()
+                    .and_is(just('\n').not())
+                    .repeated()
+                    .collect()
+                    .try_map(closure.clone()))
+                    .map(|s| format!("<h2>{}</h2>", s)),
+            just("### ")
+                .ignore_then(any()
+                    .and_is(just('\n').not())
+                    .repeated()
+                    .collect()
+                    .try_map(closure.clone()))
+                    .map(|s| format!("<h3>{}</h3>", s)),
+            just("-# ")
+                .ignore_then(any()
+                    .and_is(just('\n').not())
+                    .repeated()
+                    .collect()
+                    .try_map(closure.clone()))
+                    .map(|s| format!("<br/><small>{}</small>", s)),
+            inline(extensions.clone()),
+        )).padded_by(just('\n')));
 
     block
 }
