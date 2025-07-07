@@ -45,7 +45,7 @@ impl ParserProcedure for MarkdownParser {
             }
         })?;
 
-        let res = make_parser(&self.extensions).parse(data.body).into_result().map_err(|_e| anyhow!("Failed to parse markdown"))?;
+        let res = make_parser(self.extensions.clone()).parse(data.body).into_result().map_err(|_e| anyhow!("Failed to parse markdown"))?;
         let mut properties = properties.clone();
 
         properties.extend(data.headers);
@@ -54,16 +54,19 @@ impl ParserProcedure for MarkdownParser {
     }
 }
 
-fn make_parser<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
+fn make_parser<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
     element(extensions)
         .repeated()
         .collect::<Vec<String>>()
         .map(|elements| elements.concat())
 }
 
-fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
+fn element<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
     recursive::<'src, 'src>(|this| {
-        let closure = move |inner, _span| this.parse(inner).into_result().map_err(|_e| EmptyErr::default());
+        let extensions1 = extensions.clone();
+        let closure = move |inner: String, _span| {
+            make_parser(extensions1.clone()).parse(inner.as_ref()).into_result().map_err(|_e| EmptyErr::default())
+        };
         let mut element = choice((
             // escape char
             just("\\")
@@ -74,7 +77,7 @@ fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src
             //         .and_is(just("\n\n\n").not())
             //         .repeated()
             //         .at_least(1)
-            //         .to_slice()
+            //         .collect()
             //         .try_map(closure.clone()))
             //         .map(|s| format!("<p>{}</p>", s)),
             // just("\n\n").to(format!("<br/>")),
@@ -94,13 +97,6 @@ fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src
                         None => format!("<pre><code>{}</code></pre>", inner),
                     }
                 }),
-            // code line
-            any()
-                .and_is(just('`').not())
-                .repeated()
-                .to_slice()
-                .padded_by(just('`'))
-                .map(|inner| format!("<code>{}</code>", html_escape::encode_safe(inner))),
             // image
             just('!')
                 .ignore_then(
@@ -108,14 +104,14 @@ fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src
                         any()
                             .and_is(just(']').not())
                             .repeated()
-                            .to_slice()
+                            .collect()
                             .try_map(closure.clone())
                             .or_not()
                             .delimited_by(just('['), just(']')),
                         any()
                             .and_is(just(')').not())
                             .repeated()
-                            .to_slice()
+                            .collect()
                             .try_map(closure.clone())
                             .or_not()
                             .delimited_by(just('('), just(')')),
@@ -128,14 +124,14 @@ fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src
                 any()
                     .and_is(just(']').not())
                     .repeated()
-                    .to_slice()
+                    .collect()
                     .try_map(closure.clone())
                     .or_not()
                     .delimited_by(just('['), just(']')),
                 any()
                     .and_is(just(')').not())
                     .repeated()
-                    .to_slice()
+                    .collect()
                     .try_map(closure.clone())
                     .or_not()
                     .delimited_by(just('('), just(')')),
@@ -143,20 +139,64 @@ fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src
                 .map(|(text, link)| {
                     format!("<a href=\"{}\">{}</a>", link.unwrap_or_else(String::new), text.unwrap_or_else(String::new))
                 }),
-            // bold
+            // code line
             any()
-                .and_is(just("**").not())
+                .and_is(just('`').not())
                 .repeated()
+                .at_least(1)
                 .to_slice()
-                .padded_by(just("**"))
+                .padded_by(just('`'))
+                .map(|inner| format!("<code>{}</code>", html_escape::encode_safe(inner))),
+            // bold
+            just("**")
+                .ignore_then(any()
+                    .and_is(just("**").not())
+                    .repeated()
+                    .at_least(1)
+                    .collect::<String>()
+                    .then(any()
+                        .and_is(just('*'))
+                        .repeated()
+                        .at_least(2)
+                        .collect::<String>()
+                        // this unwrap's default probably isn't necessary
+                        .map(|s| s.strip_suffix("**").map(|s| s.to_owned()).unwrap_or(s))))
+                .map(|(left, right)| format!("{}{}", left, right))
+                .try_map(closure.clone())
                 .map(|inner| format!("<b>{}</b>", inner)),
             // italic
-            any()
-                .and_is(just('*').and_is(just("**").not()).not())
-                .repeated()
-                .to_slice()
-                .padded_by(just('*').and_is(just("**").not()))
+            just('*')
+                .ignore_then(any()
+                    .and_is(just('*').not())
+                    .repeated()
+                    .at_least(1)
+                    .collect::<String>()
+                    .then(any()
+                        .and_is(just('*'))
+                        .repeated()
+                        .at_least(1)
+                        .collect::<String>()
+                        // this unwrap's default probably isn't necessary
+                        .map(|s| s.strip_suffix("*").map(|s| s.to_owned()).unwrap_or(s))))
+                .map(|(left, right)| format!("{}{}", left, right))
+                .try_map(closure.clone())
                 .map(|inner| format!("<i>{}</i>", inner)),
+            // strikethrough
+            any()
+                .and_is(just("~~").not())
+                .repeated()
+                .at_least(1)
+                .to_slice()
+                .padded_by(just("~~"))
+                .map(|inner| format!("<s>{}</s>", inner)),
+            // underline
+            any()
+                .and_is(just("__").not())
+                .repeated()
+                .at_least(1)
+                .to_slice()
+                .padded_by(just("__"))
+                .map(|inner| format!("<u>{}</u>", inner)),
         ));
 
         for extension in extensions {
@@ -174,4 +214,20 @@ fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src
 
         element.clone().or(any().and_is(element.not()).repeated().at_least(1).collect())
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use chumsky::Parser;
+
+    use super::make_parser;
+
+    #[test]
+    fn bold_and_italic() {
+        let p = make_parser(vec![]);
+        let res = p.parse("***meow***").into_result().unwrap();
+        let expected = format!("<b><i>meow</i></b>");
+
+        assert_eq!(expected, res);
+    }
 }
