@@ -64,8 +64,12 @@ fn make_parser<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'
 
 fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
     let extensions1 = extensions.clone();
-    let closure = move |inner: String, _span| {
+    let extensions2 = extensions.clone();
+    let block_closure = move |inner: String, _span| {
         inline(extensions1.clone()).parse(inner.as_ref()).into_result().map_err(|_e| EmptyErr::default())
+    };
+    let inline_closure = move |inner: String, _span| {
+        inline(extensions2.clone()).parse(inner.as_ref()).into_result().map_err(|_e| EmptyErr::default())
     };
     let mut block = just('\n')
         .ignore_then(choice((
@@ -75,28 +79,28 @@ fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src st
                     .and_is(just('\n').not())
                     .repeated()
                     .collect()
-                    .try_map(closure.clone()))
+                    .try_map(inline_closure.clone()))
                     .map(|s| format!("<h1>{}</h1>", s)),
             just("## ")
                 .ignore_then(any()
                     .and_is(just('\n').not())
                     .repeated()
                     .collect()
-                    .try_map(closure.clone()))
+                    .try_map(inline_closure.clone()))
                     .map(|s| format!("<h2>{}</h2>", s)),
             just("### ")
                 .ignore_then(any()
                     .and_is(just('\n').not())
                     .repeated()
                     .collect()
-                    .try_map(closure.clone()))
+                    .try_map(inline_closure.clone()))
                     .map(|s| format!("<h3>{}</h3>", s)),
             just("-# ")
                 .ignore_then(any()
                     .and_is(just('\n').not())
                     .repeated()
                     .collect()
-                    .try_map(closure.clone()))
+                    .try_map(inline_closure.clone()))
                     .map(|s| format!("<br/><small>{}</small>", s)),
         )));
 
@@ -108,7 +112,7 @@ fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src st
                 .repeated()
                 .at_least(1)
                 .collect()
-                .try_map(closure.clone()))
+                .try_map(block_closure.clone()))
                 .map(|s| format!("<p>{}</p>", s)),
         inline(extensions),
     ))
