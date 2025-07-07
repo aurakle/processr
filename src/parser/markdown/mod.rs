@@ -87,27 +87,6 @@ fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src st
     };
     let mut block = choice((
         // headers
-        just("# ")
-            .ignore_then(any()
-                .and_is(just('\n').not())
-                .repeated()
-                .collect()
-                .try_map(inline_closure.clone()))
-                .map(|s| format!("<h1>{}</h1>", s)),
-        just("## ")
-            .ignore_then(any()
-                .and_is(just('\n').not())
-                .repeated()
-                .collect()
-                .try_map(inline_closure.clone()))
-                .map(|s| format!("<h2>{}</h2>", s)),
-        just("### ")
-            .ignore_then(any()
-                .and_is(just('\n').not())
-                .repeated()
-                .collect()
-                .try_map(inline_closure.clone()))
-                .map(|s| format!("<h3>{}</h3>", s)),
         just("-# ")
             .ignore_then(any()
                 .and_is(just('\n').not())
@@ -116,6 +95,27 @@ fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src st
                 .try_map(inline_closure.clone()))
                 //TODO: is the <br/> really necessary?
                 .map(|s| format!("<br/><small>{}</small>", s)),
+        just("### ")
+            .ignore_then(any()
+                .and_is(just('\n').not())
+                .repeated()
+                .collect()
+                .try_map(inline_closure.clone()))
+                .map(|s| format!("<h3>{}</h3>", s)),
+        just("## ")
+            .ignore_then(any()
+                .and_is(just('\n').not())
+                .repeated()
+                .collect()
+                .try_map(inline_closure.clone()))
+                .map(|s| format!("<h2>{}</h2>", s)),
+        just("# ")
+            .ignore_then(any()
+                .and_is(just('\n').not())
+                .repeated()
+                .collect()
+                .try_map(inline_closure.clone()))
+                .map(|s| format!("<h1>{}</h1>", s)),
     ));
 
     choice((
