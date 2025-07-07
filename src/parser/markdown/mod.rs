@@ -1,10 +1,9 @@
 use std::{collections::HashMap, rc::Rc};
 
 use anyhow::{anyhow, Result};
-use chumsky::{prelude::*, text::{ident, newline}};
+use chumsky::{prelude::*, text::{ident, keyword, newline}};
 use extension::MarkdownExtension;
 use fronma::parser::parse;
-use markdown_ppp::{html_printer::{config::Config, render_html}, parser::{config::MarkdownParserConfig, parse_markdown, MarkdownParserState}};
 
 use crate::data::Value;
 
@@ -33,21 +32,6 @@ impl MarkdownParser {
             extensions
         }
     }
-
-    fn configure(&self) -> MarkdownParserConfig {
-        let mut config = MarkdownParserConfig::default();
-
-        for extension in self.extensions.clone() {
-            //TODO: this will only use the LAST EXTENSION REGISTERED
-            // this must be fixed ASAP
-            config = match extension {
-                MarkdownExtension::Inline(func) => config.with_custom_inline_parser(func),
-                MarkdownExtension::Block(func) => config.with_custom_block_parser(func),
-            }
-        }
-
-        config
-    }
 }
 
 impl ParserProcedure for MarkdownParser {
@@ -61,12 +45,110 @@ impl ParserProcedure for MarkdownParser {
             }
         })?;
 
-        let parser_config = self.configure();
-        let state = MarkdownParserState::with_config(parser_config);
-        let ast = parse_markdown(state, data.body).map_err(|e| anyhow!("Failed to parse markdown body: {}", e))?;
-
-        let printer_config = Config::default();
-
-        Ok((render_html(&ast, printer_config).as_bytes().to_vec(), data.headers))
+        let res = make_parser(&self.extensions).parse(data.body).into_result().map_err(|_e| anyhow!("Failed to parse markdown"))?;
+        Ok((res.as_bytes().to_vec(), data.headers))
     }
+}
+
+fn make_parser<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
+    element(extensions)
+        .repeated()
+        .collect::<Vec<String>>()
+        .map(|elements| elements.concat())
+}
+
+fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
+    recursive::<'src, 'src>(|this| {
+        let closure = move |inner, _span| this.parse(inner).into_result().map_err(|_e| EmptyErr::default());
+        let mut a = choice((
+            just("\\")
+                .ignore_then(any()
+                    .map(|c| format!("{}", c))),
+            just("\n\n\n")
+                .ignore_then(any()
+                    .and_is(just("\n\n\n").not())
+                    .repeated()
+                    .at_least(1)
+                    .to_slice()
+                    .try_map(closure.clone()))
+                    .map(|s| format!("<p>{}</p>", s)),
+            just("\n\n").to(format!("<br/>")),
+            just('\n').to(format!("")),
+            just("```")
+                .ignore_then(ident().then_ignore(just('\n')).or_not())
+                .then(any()
+                    .and_is(just("```").not())
+                    .repeated()
+                    .to_slice())
+                .then_ignore(just("```"))
+                .map(|(lang, inner)| {
+                    let inner = html_escape::encode_safe(inner);
+                    match lang {
+                        Some(lang) => format!("<pre><code class=\"language-{}\">{}</code></pre>", lang, inner),
+                        None => format!("<pre><code>{}</code></pre>", inner),
+                    }
+                }),
+            any()
+                .and_is(just('`').not())
+                .repeated()
+                .to_slice()
+                .padded_by(just('`'))
+                .map(|inner| format!("<code>{}</code>", html_escape::encode_safe(inner))),
+            just('!')
+                .ignore_then(
+                    group((
+                        any()
+                            .and_is(just(']').not())
+                            .repeated()
+                            .to_slice()
+                            .try_map(closure.clone())
+                            .or_not()
+                            .delimited_by(just('['), just(']')),
+                        any()
+                            .and_is(just(')').not())
+                            .repeated()
+                            .to_slice()
+                            .try_map(closure.clone())
+                            .or_not()
+                            .delimited_by(just('('), just(')')),
+                    )))
+                .map(|(text, link)| {
+                    format!("<img src=\"{}\" alt=\"{}\"/>", link.unwrap_or_else(String::new), text.unwrap_or_else(String::new))
+                }),
+            group((
+                any()
+                    .and_is(just(']').not())
+                    .repeated()
+                    .to_slice()
+                    .try_map(closure.clone())
+                    .or_not()
+                    .delimited_by(just('['), just(']')),
+                any()
+                    .and_is(just(')').not())
+                    .repeated()
+                    .to_slice()
+                    .try_map(closure.clone())
+                    .or_not()
+                    .delimited_by(just('('), just(')')),
+            ))
+                .map(|(text, link)| {
+                    format!("<a href=\"{}\">{}</a>", link.unwrap_or_else(String::new), text.unwrap_or_else(String::new))
+                }),
+        ));
+
+        for extension in extensions {
+            // a = a
+            //     .or(any()
+            //         .and_is(just(extension.end.clone()).not())
+            //         .repeated()
+            //         .at_least(1)
+            //         .to_slice()
+            //         .try_map(closure.clone())
+            //         .map(extension.wrapper.clone())
+            //         .delimited_by(just(extension.start.clone()), just(extension.end.clone())))
+            //     .boxed();
+        }
+
+        a.clone().or(any().and_is(a.not()).repeated().at_least(1).collect())
+    })
 }
