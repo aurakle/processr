@@ -56,6 +56,7 @@ impl ParserProcedure for MarkdownParser {
 
 fn make_parser<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
     block(extensions.clone())
+        .or(inline(extensions))
         .repeated()
         .collect::<Vec<String>>()
         .map(|elements| elements.concat())
@@ -127,14 +128,20 @@ fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src st
                 .collect()
                 .try_map(block_closure.clone()))
                 .map(|s| format!("<p>{}</p>", s)),
-        inline(extensions),
     ))
 }
 
 fn inline<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
     let extensions1 = extensions.clone();
-    let closure = move |inner: String, _span| {
-        inline(extensions1.clone()).parse(inner.as_ref()).into_result().map_err(|_e| EmptyErr::default())
+    let inline_closure = move |inner: String, _span| {
+        inline(extensions1.clone())
+            .repeated()
+            .at_least(1)
+            .collect::<Vec<String>>()
+            .map(|elements| elements.concat())
+            .parse(inner.as_ref())
+            .into_result()
+            .map_err(|_e| EmptyErr::default())
     };
     let mut inline = choice((
         // escape char
@@ -154,14 +161,14 @@ fn inline<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src s
                         .and_is(just(']').not())
                         .repeated()
                         .collect()
-                        .try_map(closure.clone())
+                        .try_map(inline_closure.clone())
                         .or_not()
                         .delimited_by(just('['), just(']')),
                     any()
                         .and_is(just(')').not())
                         .repeated()
                         .collect()
-                        .try_map(closure.clone())
+                        .try_map(inline_closure.clone())
                         .or_not()
                         .delimited_by(just('('), just(')')),
                 )))
@@ -174,14 +181,14 @@ fn inline<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src s
                 .and_is(just(']').not())
                 .repeated()
                 .collect()
-                .try_map(closure.clone())
+                .try_map(inline_closure.clone())
                 .or_not()
                 .delimited_by(just('['), just(']')),
             any()
                 .and_is(just(')').not())
                 .repeated()
                 .collect()
-                .try_map(closure.clone())
+                .try_map(inline_closure.clone())
                 .or_not()
                 .delimited_by(just('('), just(')')),
         ))
@@ -226,7 +233,7 @@ fn inline<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src s
                     // this unwrap's default probably isn't necessary
                     .map(|s| s.strip_suffix("**").map(|s| s.to_owned()).unwrap_or(s))))
             .map(|(left, right)| format!("{}{}", left, right))
-            .try_map(closure.clone())
+            .try_map(inline_closure.clone())
             .map(|inner| format!("<b>{}</b>", inner)),
         // italic
         just('*')
@@ -244,7 +251,7 @@ fn inline<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src s
                     // this unwrap's default probably isn't necessary
                     .map(|s| s.strip_suffix("*").map(|s| s.to_owned()).unwrap_or(s))))
             .map(|(left, right)| format!("{}{}", left, right))
-            .try_map(closure.clone())
+            .try_map(inline_closure.clone())
             .map(|inner| format!("<i>{}</i>", inner)),
         // strikethrough
         any()
@@ -274,6 +281,12 @@ fn inline<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src s
 
 #[cfg(test)]
 mod tests {
+    mod document {
+        use chumsky::Parser;
+
+        use crate::parser::markdown::make_parser;
+    }
+
     mod block {
         use chumsky::Parser;
 
@@ -320,6 +333,15 @@ mod tests {
             let p = block(vec![]);
             let res = p.parse("\n\n\nmeow").into_result().unwrap();
             let expected = format!("<p>meow</p>");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
+        fn paragraph_with_bold_and_italics() {
+            let p = block(vec![]);
+            let res = p.parse("\n\n\n***meow***").into_result().unwrap();
+            let expected = format!("<p><b><i>meow</i></b></p>");
 
             assert_eq!(expected, res);
         }
