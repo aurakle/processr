@@ -66,7 +66,7 @@ fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src st
     let extensions1 = extensions.clone();
     let extensions2 = extensions.clone();
     let block_closure = move |inner: String, _span| {
-        inline(extensions1.clone())
+        block(extensions1.clone())
             .repeated()
             .at_least(1)
             .collect::<Vec<String>>()
