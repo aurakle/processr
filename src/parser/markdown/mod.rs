@@ -100,7 +100,7 @@ fn element<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src 
                     .repeated()
                     .collect()
                     .try_map(closure.clone()))
-                    .map(|s| format!("<small>{}</small>", s)),
+                    .map(|s| format!("<br/><small>{}</small>", s)),
             // paragraphs
             just("\n\n\n")
                 .ignore_then(any()
@@ -114,21 +114,6 @@ fn element<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src 
             just("\n\n").to(format!("<br/>")),
             // manual wrapping
             just('\n').to(format!("")),
-            // code block
-            just("```")
-                .ignore_then(ident().then_ignore(just('\n')).or_not())
-                .then(any()
-                    .and_is(just("```").not())
-                    .repeated()
-                    .to_slice())
-                .then_ignore(just("```"))
-                .map(|(lang, inner)| {
-                    let inner = html_escape::encode_safe(inner);
-                    match lang {
-                        Some(lang) => format!("<pre><code class=\"language-{}\">{}</code></pre>", lang, inner),
-                        None => format!("<pre><code>{}</code></pre>", inner),
-                    }
-                }),
             // image
             just('!')
                 .ignore_then(
@@ -170,6 +155,21 @@ fn element<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src 
             ))
                 .map(|(text, link)| {
                     format!("<a href=\"{}\">{}</a>", link.unwrap_or_else(String::new), text.unwrap_or_else(String::new))
+                }),
+            // code block
+            just("```")
+                .ignore_then(ident().then_ignore(just('\n')).or_not())
+                .then(any()
+                    .and_is(just("```").not())
+                    .repeated()
+                    .to_slice())
+                .then_ignore(just("```"))
+                .map(|(lang, inner)| {
+                    let inner = html_escape::encode_safe(inner);
+                    match lang {
+                        Some(lang) => format!("<pre><code class=\"language-{}\">{}</code></pre>", lang, inner),
+                        None => format!("<pre><code>{}</code></pre>", inner),
+                    }
                 }),
             // code line
             any()
@@ -256,10 +256,100 @@ mod tests {
     use super::make_parser;
 
     #[test]
+    fn code_block() {
+        let p = make_parser(vec![]);
+        let res = p.parse("```meow```").into_result().unwrap();
+        let expected = format!("<pre><code>meow</code></pre>");
+
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn code_line() {
+        let p = make_parser(vec![]);
+        let res = p.parse("`meow`").into_result().unwrap();
+        let expected = format!("<code>meow</code>");
+
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn bold() {
+        let p = make_parser(vec![]);
+        let res = p.parse("**meow**").into_result().unwrap();
+        let expected = format!("<b>meow</b>");
+
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn italic() {
+        let p = make_parser(vec![]);
+        let res = p.parse("*meow*").into_result().unwrap();
+        let expected = format!("<i>meow</i>");
+
+        assert_eq!(expected, res);
+    }
+
+    #[test]
     fn bold_and_italic() {
         let p = make_parser(vec![]);
         let res = p.parse("***meow***").into_result().unwrap();
         let expected = format!("<b><i>meow</i></b>");
+
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn strikethrough() {
+        let p = make_parser(vec![]);
+        let res = p.parse("~~meow~~").into_result().unwrap();
+        let expected = format!("<s>meow</s>");
+
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn underline() {
+        let p = make_parser(vec![]);
+        let res = p.parse("__meow__").into_result().unwrap();
+        let expected = format!("<u>meow</u>");
+
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn header1() {
+        let p = make_parser(vec![]);
+        let res = p.parse("\n# meow").into_result().unwrap();
+        let expected = format!("<h1>meow</h1>");
+
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn header2() {
+        let p = make_parser(vec![]);
+        let res = p.parse("\n## meow").into_result().unwrap();
+        let expected = format!("<h2>meow</h2>");
+
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn header3() {
+        let p = make_parser(vec![]);
+        let res = p.parse("\n### meow").into_result().unwrap();
+        let expected = format!("<h3>meow</h3>");
+
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn small() {
+        let p = make_parser(vec![]);
+        let res = p.parse("\n-# meow").into_result().unwrap();
+        let expected = format!("<br/><small>meow</small>");
 
         assert_eq!(expected, res);
     }
