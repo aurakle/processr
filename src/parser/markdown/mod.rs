@@ -128,6 +128,8 @@ fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src st
                 .collect()
                 .try_map(block_closure.clone()))
                 .map(|s| format!("<p>{}</p>", s)),
+        // line breaks
+        just("\n\n").to(format!("<br/>")),
     ))
 }
 
@@ -149,8 +151,6 @@ fn inline<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src s
         just("\\")
             .ignore_then(any()
                 .map(|c| format!("{}", c))),
-        // line breaks
-        just("\n\n").to(format!("<br/>")),
         // manual wrapping
         just('\n').to(format!("")),
         // image
