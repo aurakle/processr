@@ -64,20 +64,21 @@ fn make_parser<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &
 fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
     recursive::<'src, 'src>(|this| {
         let closure = move |inner, _span| this.parse(inner).into_result().map_err(|_e| EmptyErr::default());
-        let mut a = choice((
+        let mut element = choice((
+            // escape char
             just("\\")
                 .ignore_then(any()
                     .map(|c| format!("{}", c))),
-            just("\n\n\n")
-                .ignore_then(any()
-                    .and_is(just("\n\n\n").not())
-                    .repeated()
-                    .at_least(1)
-                    .to_slice()
-                    .try_map(closure.clone()))
-                    .map(|s| format!("<p>{}</p>", s)),
-            just("\n\n").to(format!("<br/>")),
-            just('\n').to(format!("")),
+            // just("\n\n\n")
+            //     .ignore_then(any()
+            //         .and_is(just("\n\n\n").not())
+            //         .repeated()
+            //         .at_least(1)
+            //         .to_slice()
+            //         .try_map(closure.clone()))
+            //         .map(|s| format!("<p>{}</p>", s)),
+            // just("\n\n").to(format!("<br/>")),
+            // just('\n').to(format!("")),
             just("```")
                 .ignore_then(ident().then_ignore(just('\n')).or_not())
                 .then(any()
@@ -153,6 +154,6 @@ fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src
             //     .boxed();
         }
 
-        a.clone().or(any().and_is(a.not()).repeated().at_least(1).collect())
+        element.clone().or(any().and_is(element.not()).repeated().at_least(1).collect())
     })
 }
