@@ -123,12 +123,12 @@ fn inline<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src s
     };
     let mut inline = choice((
         // escape char
+        // TODO: should this be moved to a different parser?
         just("\\")
             .ignore_then(any()
                 .map(|c| format!("{}", c))),
         // manual wrapping
         just('\n').to(format!("")),
-        //TODO: move the elements above to a different parser??
         // image
         just('!')
             .ignore_then(
@@ -247,7 +247,7 @@ fn inline<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src s
             .map(|inner| format!("<u>{}</u>", inner)),
     ));
 
-    inline.clone().or(any().and_is(inline.not()).repeated().at_least(1).collect())
+    inline.clone().or(any().and_is(inline.not()).and_is(just('\n').not()).repeated().at_least(1).collect())
 }
 
 #[cfg(test)]
