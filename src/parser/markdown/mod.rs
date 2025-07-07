@@ -55,7 +55,8 @@ impl ParserProcedure for MarkdownParser {
 }
 
 fn make_parser<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
-    block(extensions)
+    block(extensions.clone())
+        .or(inline(extensions))
         .repeated()
         .collect::<Vec<String>>()
         .map(|elements| elements.concat())
