@@ -85,38 +85,38 @@ fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src st
             .into_result()
             .map_err(|_e| EmptyErr::default())
     };
-    let mut block = just('\n')
-        .ignore_then(choice((
-            // headers
-            just("# ")
-                .ignore_then(any()
-                    .and_is(just('\n').not())
-                    .repeated()
-                    .collect()
-                    .try_map(inline_closure.clone()))
-                    .map(|s| format!("<h1>{}</h1>", s)),
-            just("## ")
-                .ignore_then(any()
-                    .and_is(just('\n').not())
-                    .repeated()
-                    .collect()
-                    .try_map(inline_closure.clone()))
-                    .map(|s| format!("<h2>{}</h2>", s)),
-            just("### ")
-                .ignore_then(any()
-                    .and_is(just('\n').not())
-                    .repeated()
-                    .collect()
-                    .try_map(inline_closure.clone()))
-                    .map(|s| format!("<h3>{}</h3>", s)),
-            just("-# ")
-                .ignore_then(any()
-                    .and_is(just('\n').not())
-                    .repeated()
-                    .collect()
-                    .try_map(inline_closure.clone()))
-                    .map(|s| format!("<br/><small>{}</small>", s)),
-        )));
+    let mut block = choice((
+        // headers
+        just("# ")
+            .ignore_then(any()
+                .and_is(just('\n').not())
+                .repeated()
+                .collect()
+                .try_map(inline_closure.clone()))
+                .map(|s| format!("<h1>{}</h1>", s)),
+        just("## ")
+            .ignore_then(any()
+                .and_is(just('\n').not())
+                .repeated()
+                .collect()
+                .try_map(inline_closure.clone()))
+                .map(|s| format!("<h2>{}</h2>", s)),
+        just("### ")
+            .ignore_then(any()
+                .and_is(just('\n').not())
+                .repeated()
+                .collect()
+                .try_map(inline_closure.clone()))
+                .map(|s| format!("<h3>{}</h3>", s)),
+        just("-# ")
+            .ignore_then(any()
+                .and_is(just('\n').not())
+                .repeated()
+                .collect()
+                .try_map(inline_closure.clone()))
+                //TODO: is the <br/> really necessary?
+                .map(|s| format!("<br/><small>{}</small>", s)),
+    ));
 
     choice((
         block,
@@ -295,7 +295,7 @@ mod tests {
         #[test]
         fn header1() {
             let p = block(vec![]);
-            let res = p.parse("\n# meow").into_result().unwrap();
+            let res = p.parse("# meow").into_result().unwrap();
             let expected = format!("<h1>meow</h1>");
 
             assert_eq!(expected, res);
@@ -304,7 +304,7 @@ mod tests {
         #[test]
         fn header2() {
             let p = block(vec![]);
-            let res = p.parse("\n## meow").into_result().unwrap();
+            let res = p.parse("## meow").into_result().unwrap();
             let expected = format!("<h2>meow</h2>");
 
             assert_eq!(expected, res);
@@ -313,7 +313,7 @@ mod tests {
         #[test]
         fn header3() {
             let p = block(vec![]);
-            let res = p.parse("\n### meow").into_result().unwrap();
+            let res = p.parse("### meow").into_result().unwrap();
             let expected = format!("<h3>meow</h3>");
 
             assert_eq!(expected, res);
@@ -322,7 +322,7 @@ mod tests {
         #[test]
         fn small() {
             let p = block(vec![]);
-            let res = p.parse("\n-# meow").into_result().unwrap();
+            let res = p.parse("-# meow").into_result().unwrap();
             let expected = format!("<br/><small>meow</small>");
 
             assert_eq!(expected, res);
