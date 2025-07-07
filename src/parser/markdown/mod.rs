@@ -46,7 +46,11 @@ impl ParserProcedure for MarkdownParser {
         })?;
 
         let res = make_parser(&self.extensions).parse(data.body).into_result().map_err(|_e| anyhow!("Failed to parse markdown"))?;
-        Ok((res.as_bytes().to_vec(), data.headers))
+        let mut properties = properties.clone();
+
+        properties.extend(data.headers);
+
+        Ok((res.as_bytes().to_vec(), properties))
     }
 }
 
