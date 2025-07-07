@@ -72,16 +72,16 @@ fn element<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src 
             just("\\")
                 .ignore_then(any()
                     .map(|c| format!("{}", c))),
-            // just("\n\n\n")
-            //     .ignore_then(any()
-            //         .and_is(just("\n\n\n").not())
-            //         .repeated()
-            //         .at_least(1)
-            //         .collect()
-            //         .try_map(closure.clone()))
-            //         .map(|s| format!("<p>{}</p>", s)),
-            // just("\n\n").to(format!("<br/>")),
-            // just('\n').to(format!("")),
+            just("\n\n\n")
+                .ignore_then(any()
+                    .and_is(just("\n\n\n").not())
+                    .repeated()
+                    .at_least(1)
+                    .collect()
+                    .try_map(closure.clone()))
+                    .map(|s| format!("<p>{}</p>", s)),
+            just("\n\n").to(format!("<br/>")),
+            just('\n').to(format!("")),
             // code block
             just("```")
                 .ignore_then(ident().then_ignore(just('\n')).or_not())
@@ -172,6 +172,7 @@ fn element<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src 
                     .at_least(1)
                     .collect::<String>()
                     .then(any()
+                        // this maybe shouldn't match if you have a case such as * some text **
                         .and_is(just('*'))
                         .repeated()
                         .at_least(1)
