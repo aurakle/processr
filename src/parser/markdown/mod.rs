@@ -55,237 +55,219 @@ impl ParserProcedure for MarkdownParser {
 }
 
 fn make_parser<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
-    element(extensions)
+    block(extensions.clone())
         .repeated()
         .collect::<Vec<String>>()
         .map(|elements| elements.concat())
 }
 
-fn element<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
-    choice((
-        inline(extensions.clone()),
-        block(extensions.clone()),
-    ))
-}
-
 fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
-    let extensions1 = extensions.clone();
-    let extensions2 = extensions.clone();
-    let block_closure = move |inner: String, _span| {
-        block(extensions1.clone())
-            .repeated()
-            .at_least(1)
-            .collect::<Vec<String>>()
-            .map(|elements| elements.concat())
-            .parse(inner.as_ref())
-            .into_result()
-            .map_err(|_e| EmptyErr::default())
-    };
-    let inline_closure = move |inner: String, _span| {
-        inline(extensions2.clone())
-            .repeated()
-            .at_least(1)
-            .collect::<Vec<String>>()
-            .map(|elements| elements.concat())
-            .parse(inner.as_ref())
-            .into_result()
-            .map_err(|_e| EmptyErr::default())
-    };
-    let mut block = choice((
-        // headers
-        just("-# ")
-            .ignore_then(any()
-                .and_is(just('\n').not())
-                .repeated()
-                .collect()
-                .try_map(inline_closure.clone()))
+    recursive(|this| {
+        let inline = inline(this.clone(), extensions.clone());
+        let mut block = choice((
+            // headers
+            inline.clone()
+                .nested_in(just("-# ")
+                    .ignore_then(any()
+                        .and_is(just('\n').not())
+                        .repeated()
+                        .at_least(1)
+                        .to_slice()))
                 //TODO: is the <br/> really necessary?
                 .map(|s| format!("<br/><small>{}</small>", s)),
-        just("### ")
-            .ignore_then(any()
-                .and_is(just('\n').not())
-                .repeated()
-                .collect()
-                .try_map(inline_closure.clone()))
+            inline.clone()
+                .nested_in(just("### ")
+                    .ignore_then(any()
+                        .and_is(just('\n').not())
+                        .repeated()
+                        .at_least(1)
+                        .to_slice()))
                 .map(|s| format!("<h3>{}</h3>", s)),
-        just("## ")
-            .ignore_then(any()
-                .and_is(just('\n').not())
-                .repeated()
-                .collect()
-                .try_map(inline_closure.clone()))
+            inline.clone()
+                .nested_in(just("## ")
+                    .ignore_then(any()
+                        .and_is(just('\n').not())
+                        .repeated()
+                        .at_least(1)
+                        .to_slice()))
                 .map(|s| format!("<h2>{}</h2>", s)),
-        just("# ")
-            .ignore_then(any()
-                .and_is(just('\n').not())
-                .repeated()
-                .collect()
-                .try_map(inline_closure.clone()))
+            inline.clone()
+                .nested_in(just("# ")
+                    .ignore_then(any()
+                        .and_is(just('\n').not())
+                        .repeated()
+                        .at_least(1)
+                        .to_slice()))
                 .map(|s| format!("<h1>{}</h1>", s)),
-    ));
+        )).boxed();
 
-    choice((
-        block,
-        // paragraph
-        just("\n\n\n")
-            .ignore_then(any()
-                .and_is(just("\n\n\n").not())
-                .repeated()
-                .at_least(1)
-                .collect()
-                .try_map(block_closure.clone()))
+        choice((
+            block,
+            // paragraph
+            this.clone()
+                .nested_in(just("\n\n\n")
+                    .ignore_then(any()
+                        .and_is(just("\n\n\n").not())
+                        .repeated()
+                        .at_least(1)
+                        .to_slice()))
                 .map(|s| format!("<p>{}</p>", s)),
-        // line break
-        just("\n\n").to(format!("<br/>")),
-    ))
+            // line break
+            just("\n\n").to(format!("<br/>")),
+            // everything else
+            inline,
+        ))
+    })
 }
 
-fn inline<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
-    let extensions1 = extensions.clone();
-    let inline_closure = move |inner: String, _span| {
-        inline(extensions1.clone())
-            .repeated()
-            .at_least(1)
-            .collect::<Vec<String>>()
-            .map(|elements| elements.concat())
-            .parse(inner.as_ref())
-            .into_result()
-            .map_err(|_e| EmptyErr::default())
-    };
-    let mut inline = choice((
-        // image
-        just('!')
-            .ignore_then(
-                group((
-                    any()
+fn inline<'src>(block: Recursive<dyn Parser<'src, &'src str, String> + 'src>, extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
+    recursive(|this| {
+        let mut inline = choice((
+            // image
+            just('!')
+                .ignore_then(
+                    group((
+                        this.clone()
+                            .nested_in(any()
+                                .and_is(just(']').not())
+                                .repeated()
+                                .to_slice())
+                            .or_not()
+                            .delimited_by(just('['), just(']')),
+                        this.clone()
+                            .nested_in(any()
+                                .and_is(just(')').not())
+                                .repeated()
+                                .to_slice())
+                            .or_not()
+                            .delimited_by(just('('), just(')')),
+                    )))
+                .map(|(text, link)| {
+                    format!("<img src=\"{}\" alt=\"{}\"/>", link.unwrap_or_else(String::new), text.unwrap_or_else(String::new))
+                }),
+            // link
+            group((
+                this.clone()
+                    .nested_in(any()
                         .and_is(just(']').not())
                         .repeated()
-                        .collect()
-                        .try_map(inline_closure.clone())
-                        .or_not()
-                        .delimited_by(just('['), just(']')),
-                    any()
+                        .to_slice())
+                    .or_not()
+                    .delimited_by(just('['), just(']')),
+                this.clone()
+                    .nested_in(any()
                         .and_is(just(')').not())
                         .repeated()
-                        .collect()
-                        .try_map(inline_closure.clone())
-                        .or_not()
-                        .delimited_by(just('('), just(')')),
-                )))
-            .map(|(text, link)| {
-                format!("<img src=\"{}\" alt=\"{}\"/>", link.unwrap_or_else(String::new), text.unwrap_or_else(String::new))
-            }),
-        // link
-        group((
-            any()
-                .and_is(just(']').not())
-                .repeated()
-                .collect()
-                .try_map(inline_closure.clone())
-                .or_not()
-                .delimited_by(just('['), just(']')),
-            any()
-                .and_is(just(')').not())
-                .repeated()
-                .collect()
-                .try_map(inline_closure.clone())
-                .or_not()
-                .delimited_by(just('('), just(')')),
-        ))
-            .map(|(text, link)| {
-                format!("<a href=\"{}\">{}</a>", link.unwrap_or_else(String::new), text.unwrap_or_else(String::new))
-            }),
-        // code block
-        just("```")
-            .ignore_then(ident().then_ignore(just('\n')).or_not())
-            .then(any()
-                .and_is(just("```").not())
-                .repeated()
-                .to_slice())
-            .then_ignore(just("```"))
-            .map(|(lang, inner)| {
-                let inner = html_escape::encode_safe(inner);
-                match lang {
-                    Some(lang) => format!("<pre><code class=\"language-{}\">{}</code></pre>", lang, inner),
-                    None => format!("<pre><code>{}</code></pre>", inner),
-                }
-            }),
-        // code line
-        any()
-            .and_is(just('`').not())
-            .repeated()
-            .at_least(1)
-            .to_slice()
-            .padded_by(just('`'))
-            .map(|inner| format!("<code>{}</code>", html_escape::encode_safe(inner))),
-        // bold
-        just("**")
-            .ignore_then(any()
-                .and_is(just("**").not())
-                .repeated()
-                .at_least(1)
-                .collect::<String>()
+                        .to_slice())
+                    .or_not()
+                    .delimited_by(just('('), just(')')),
+            ))
+                .map(|(text, link)| {
+                    format!("<a href=\"{}\">{}</a>", link.unwrap_or_else(String::new), text.unwrap_or_else(String::new))
+                }),
+            // code block
+            just("```")
+                .ignore_then(ident().then_ignore(just('\n')).or_not())
                 .then(any()
-                    .and_is(just('*'))
-                    .repeated()
-                    .at_least(2)
-                    .collect::<String>()
-                    // this unwrap's default probably isn't necessary
-                    .map(|s| s.strip_suffix("**").map(|s| s.to_owned()).unwrap_or(s))))
-            .map(|(left, right)| format!("{}{}", left, right))
-            .try_map(inline_closure.clone())
-            .map(|inner| format!("<b>{}</b>", inner)),
-        // italic
-        just('*')
-            .ignore_then(any()
-                .and_is(just('*').not())
-                .repeated()
-                .at_least(1)
-                .collect::<String>()
-                .then(any()
-                    // this maybe shouldn't match if you have a case such as * some text **
-                    .and_is(just('*'))
+                    .and_is(just("```").not())
                     .repeated()
                     .at_least(1)
-                    .collect::<String>()
-                    // this unwrap's default probably isn't necessary
-                    .map(|s| s.strip_suffix("*").map(|s| s.to_owned()).unwrap_or(s))))
-            .map(|(left, right)| format!("{}{}", left, right))
-            .try_map(inline_closure.clone())
-            .map(|inner| format!("<i>{}</i>", inner)),
-        // strikethrough
-        any()
-            .and_is(just("~~").not())
-            .repeated()
-            .at_least(1)
-            .to_slice()
-            .padded_by(just("~~"))
-            .map(|inner| format!("<s>{}</s>", inner)),
-        // underline
-        any()
-            .and_is(just("__").not())
-            .repeated()
-            .at_least(1)
-            .to_slice()
-            .padded_by(just("__"))
-            .map(|inner| format!("<u>{}</u>", inner)),
-    ));
+                    .to_slice())
+                .then_ignore(just("```"))
+                .map(|(lang, inner)| {
+                    let inner = html_escape::encode_safe(inner);
+                    match lang {
+                        Some(lang) => format!("<pre><code class=\"language-{}\">{}</code></pre>", lang, inner),
+                        None => format!("<pre><code>{}</code></pre>", inner),
+                    }
+                }),
+            // code line
+            any()
+                .and_is(just('`').not())
+                .repeated()
+                .at_least(1)
+                .to_slice()
+                .padded_by(just('`'))
+                .map(|inner| format!("<code>{}</code>", html_escape::encode_safe(inner))),
+            // bold
+            this.clone()
+                .nested_in(just("**")
+                    .ignore_then(any()
+                        .and_is(just("**").not())
+                        .repeated()
+                        .at_least(1)
+                        .collect::<String>()
+                        .then(just('*')
+                            .and_is(just("***"))
+                            .repeated()
+                            .collect::<String>())
+                        .to_slice())
+                    .then_ignore(just("**")))
+                .map(|inner| format!("<b>{}</b>", inner)),
+            // italic
+            this.clone()
+                .nested_in(just('*')
+                    .ignore_then(any()
+                        .and_is(just('*').not())
+                        .repeated()
+                        .at_least(1)
+                        .collect::<String>()
+                        .then(just('*')
+                            .and_is(just("**"))
+                            .repeated()
+                            .collect::<String>())
+                        .to_slice())
+                    .then_ignore(just('*')))
+                .map(|inner| format!("<i>{}</i>", inner)),
+            // strikethrough
+            this.clone()
+                .nested_in(just("~~")
+                    .ignore_then(any()
+                        .and_is(just("~~").not())
+                        .repeated()
+                        .at_least(1)
+                        .collect::<String>()
+                        .then(just('~')
+                            .and_is(just("~~~"))
+                            .repeated()
+                            .collect::<String>())
+                        .to_slice())
+                    .then_ignore(just("~~")))
+                .map(|inner| format!("<s>{}</s>", inner)),
+            // underline
+            this.clone()
+                .nested_in(just("__")
+                    .ignore_then(any()
+                        .and_is(just("__").not())
+                        .repeated()
+                        .at_least(1)
+                        .collect::<String>()
+                        .then(just('_')
+                            .and_is(just("___"))
+                            .repeated()
+                            .collect::<String>())
+                        .to_slice())
+                    .then_ignore(just("__")))
+                .map(|inner| format!("<u>{}</u>", inner)),
+        )).boxed();
 
-    choice((
-        // escape char
-        just("\\")
-            .ignore_then(any()
-                .map(|c| format!("{}", c))),
-        // manual wrapping
-        just('\n').to(format!("")),
-        inline.clone(),
-        none_of("\n")
-            //TODO: cursed recursive
-            .and_is(element.not())
-            .repeated()
-            .at_least(1)
-            .collect(),
-    ))
+        choice((
+            // escape char
+            just("\\")
+                .ignore_then(any()
+                    .map(|c| format!("{}", c))),
+            // manual wrapping
+            just('\n')
+                .and_is(block.not())
+                .to(format!("")),
+            inline.clone(),
+            none_of("\n")
+                .and_is(inline.not())
+                .repeated()
+                .at_least(1)
+                .collect::<String>(),
+        )).repeated().at_least(1).collect::<Vec<String>>().map(|elements| elements.concat())
+    })
 }
 
 #[cfg(test)]
@@ -359,11 +341,11 @@ mod tests {
     mod inline {
         use chumsky::Parser;
 
-        use crate::parser::markdown::inline;
+        use crate::parser::markdown::block;
 
         #[test]
         fn code_block() {
-            let p = inline(vec![]);
+            let p = block(vec![]);
             let res = p.parse("```meow```").into_result().unwrap();
             let expected = format!("<pre><code>meow</code></pre>");
 
@@ -372,7 +354,7 @@ mod tests {
 
         #[test]
         fn code_line() {
-            let p = inline(vec![]);
+            let p = block(vec![]);
             let res = p.parse("`meow`").into_result().unwrap();
             let expected = format!("<code>meow</code>");
 
@@ -381,7 +363,7 @@ mod tests {
 
         #[test]
         fn bold() {
-            let p = inline(vec![]);
+            let p = block(vec![]);
             let res = p.parse("**meow**").into_result().unwrap();
             let expected = format!("<b>meow</b>");
 
@@ -390,7 +372,7 @@ mod tests {
 
         #[test]
         fn italic() {
-            let p = inline(vec![]);
+            let p = block(vec![]);
             let res = p.parse("*meow*").into_result().unwrap();
             let expected = format!("<i>meow</i>");
 
@@ -399,7 +381,7 @@ mod tests {
 
         #[test]
         fn bold_and_italic() {
-            let p = inline(vec![]);
+            let p = block(vec![]);
             let res = p.parse("***meow***").into_result().unwrap();
             let expected = format!("<b><i>meow</i></b>");
 
@@ -408,7 +390,7 @@ mod tests {
 
         #[test]
         fn strikethrough() {
-            let p = inline(vec![]);
+            let p = block(vec![]);
             let res = p.parse("~~meow~~").into_result().unwrap();
             let expected = format!("<s>meow</s>");
 
@@ -417,7 +399,7 @@ mod tests {
 
         #[test]
         fn underline() {
-            let p = inline(vec![]);
+            let p = block(vec![]);
             let res = p.parse("__meow__").into_result().unwrap();
             let expected = format!("<u>meow</u>");
 
