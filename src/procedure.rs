@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::{env, path::PathBuf};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use time::macros::format_description;
 use time::{format_description, Date};
 use crate::data::Value;
@@ -200,7 +200,9 @@ pub struct Parse<P: SingleProcedure, PARSER: ParserProcedure> {
 impl<P: SingleProcedure, PARSER: ParserProcedure> SingleProcedure for Parse<P, PARSER> {
     fn eval(&self) -> Result<Item> {
         let item = self.prior.eval()?;
-        let (bytes, properties) = self.parser.process(&item.bytes, &item.properties)?;
+        let (bytes, properties) = self.parser
+            .process(&item.bytes, &item.properties)
+            .context(format!("While parsing {}", item.path.display()))?;
 
         Ok(Item {
             path: item.path.clone(),
@@ -224,7 +226,9 @@ impl<P: SingleProcedure, T: SingleProcedure> SingleProcedure for ApplyTemplate<P
         let mut properties = template.properties.clone();
         properties.extend(item.properties_with_url_and_body()?);
 
-        let (bytes, properties) = TemplateParser::default().process(&bytes, &properties)?;
+        let (bytes, properties) = TemplateParser::default()
+            .process(&bytes, &properties)
+            .context(format!("While applying template {}", template.path.display()))?;
 
         Ok(Item {
             path: item.path.clone(),
@@ -242,7 +246,7 @@ pub struct LoadAndApplyTemplate<P: SingleProcedure> {
 
 impl<P: SingleProcedure> SingleProcedure for LoadAndApplyTemplate<P> {
     fn eval(&self) -> Result<Item> {
-        self.prior.clone().apply(selector::exact(&self.path)?).eval()
+        self.prior.clone().apply(selector::exact(&self.path).context(format!("While loading template {}", self.path))?).eval()
     }
 }
 
