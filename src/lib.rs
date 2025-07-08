@@ -73,7 +73,7 @@ macro_rules! processr {
                 $crate::clean($out)?
             }
 
-            $(let $names = $rules; $crate::anyhow::Context::context($crate::procedure::Procedure::write(&$names, $out), "While evaluating rule")?;)+
+            $(let $names = $rules; $crate::procedure::Procedure::write(&$names, $out)?;)+
 
             Ok(())
         }

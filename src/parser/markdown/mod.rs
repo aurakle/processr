@@ -118,6 +118,10 @@ fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src st
             // everything else
             inline,
         ))
+            .map(|s| {
+                eprint!("{}", s);
+                s
+            })
     })
 }
 
