@@ -57,9 +57,10 @@ impl ParserProcedure for MarkdownParser {
 
 fn make_parser<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
     recursive(|this| {
+        let block = block(this.clone(), extensions.clone()).boxed();
         choice((
-            block(this.clone(), extensions.clone()),
-            inline(this.clone(), extensions.clone()),
+            block.clone(),
+            inline(this.clone(), block, extensions.clone()),
         ))
             .repeated()
             .at_least(1)
@@ -70,49 +71,54 @@ fn make_parser<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &
 
 fn block<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
     recursive(|this| {
-        let inline = inline(parser.clone(), extensions.clone());
-        let mut block = choice((
-            // headers
-            inline.clone()
-                .nested_in(just("-# ")
-                    .ignore_then(any()
-                        .and_is(line_terminator().not())
-                        .repeated()
-                        .at_least(1)
-                        .to_slice()))
-                //TODO: is the <br/> really necessary?
-                .map(|s| format!("<br/><small>{}</small>", s)),
-            inline.clone()
-                .nested_in(just("### ")
-                    .ignore_then(any()
-                        .and_is(line_terminator().not())
-                        .repeated()
-                        .at_least(1)
-                        .to_slice()))
-                .map(|s| format!("<h3>{}</h3>", s)),
-            inline.clone()
-                .nested_in(just("## ")
-                    .ignore_then(any()
-                        .and_is(line_terminator().not())
-                        .repeated()
-                        .at_least(1)
-                        .to_slice()))
-                .map(|s| format!("<h2>{}</h2>", s)),
-            inline.clone()
-                .nested_in(just("# ")
-                    .ignore_then(any()
-                        .and_is(line_terminator().not())
-                        .repeated()
-                        .at_least(1)
-                        .to_slice()))
-                .map(|s| format!("<h1>{}</h1>", s)),
-        )).boxed();
-
-        choice((
-            block,
-            // paragraph
+        let inline = inline(parser.clone(), this.clone().boxed(), extensions.clone());
+        let mut block = newline()
+            .repeated()
+            .ignore_then(
+                choice((
+                    // headers
+                    inline.clone()
+                        .nested_in(just("-# ")
+                            .ignore_then(any()
+                                .and_is(line_terminator().not())
+                                .repeated()
+                                .at_least(1)
+                                .to_slice()))
+                        //TODO: is the <br/> really necessary?
+                        .map(|s| format!("<br/><small>{}</small>", s)),
+                    inline.clone()
+                        .nested_in(just("### ")
+                            .ignore_then(any()
+                                .and_is(line_terminator().not())
+                                .repeated()
+                                .at_least(1)
+                                .to_slice()))
+                        .map(|s| format!("<h3>{}</h3>", s)),
+                    inline.clone()
+                        .nested_in(just("## ")
+                            .ignore_then(any()
+                                .and_is(line_terminator().not())
+                                .repeated()
+                                .at_least(1)
+                                .to_slice()))
+                        .map(|s| format!("<h2>{}</h2>", s)),
+                    inline.clone()
+                        .nested_in(just("# ")
+                            .ignore_then(any()
+                                .and_is(line_terminator().not())
+                                .repeated()
+                                .at_least(1)
+                                .to_slice()))
+                        .map(|s| format!("<h1>{}</h1>", s)),
+                )))
+            .boxed();
+        let paragraph = recursive(|paragraph| {
             this.clone()
+                .and_is(paragraph.not())
                 .or(inline)
+                .repeated()
+                .collect::<Vec<String>>()
+                .map(|elements| elements.concat())
                 .nested_in(newline()
                     .repeated()
                     .at_least(3)
@@ -124,14 +130,19 @@ fn block<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, ex
                         .repeated()
                         .at_least(1)
                         .to_slice()))
-                .map(|s| format!("<p>{}</p>", s)),
+                .map(|s| format!("<p>{}</p>", s))
+        });
+
+        choice((
+            block,
+            paragraph,
             // line break
             newline().repeated().exactly(2).to(format!("<br/>")),
         ))
     })
 }
 
-fn inline<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
+fn inline<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, block: Boxed<'src, 'src, &'src str, String>, extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
     recursive(|this| {
         let mut inline = choice((
             // image
@@ -271,7 +282,7 @@ fn inline<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, e
                 .repeated()
                 .at_least(1)
                 .collect::<String>(),
-        )).repeated().at_least(1).collect::<Vec<String>>().map(|elements| elements.concat())
+        )).and_is(block.not()).repeated().at_least(1).collect::<Vec<String>>().map(|elements| elements.concat())
     })
 }
 
@@ -338,6 +349,24 @@ mod tests {
             let p = make_parser(&vec![]);
             let res = p.parse("\n\n\n***meow***").into_result().unwrap();
             let expected = format!("<p><b><i>meow</i></b></p>");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
+        fn paragraph_followed_by_header() {
+            let p = make_parser(&vec![]);
+            let res = p.parse("\n\n\nmeow\n# Some header").into_result().unwrap();
+            let expected = format!("<p>meow<h1>Some header</h1></p>");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
+        fn paragraph_followed_by_fake_header() {
+            let p = make_parser(&vec![]);
+            let res = p.parse("\n\n\nmeow# Some header").into_result().unwrap();
+            let expected = format!("<p>meow# Some header</p>");
 
             assert_eq!(expected, res);
         }
