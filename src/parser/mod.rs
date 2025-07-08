@@ -22,3 +22,10 @@ fn whitespace<'src>() -> impl Parser<'src, &'src str, ()> + Clone {
         .collect::<Vec<()>>()
         .ignored()
 }
+
+fn line_terminator<'src>() -> impl Parser<'src, &'src str, ()> + Clone {
+    choice((
+        newline(),
+        end(),
+    ))
+}

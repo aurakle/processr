@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
-use chumsky::{prelude::*, text::ident};
+use chumsky::{prelude::*, text::{ident, newline}};
 use extension::MarkdownExtension;
 use fronma::parser::parse;
 
 use crate::data::Value;
 
-use super::ParserProcedure;
+use super::{line_terminator, ParserProcedure};
 
 pub mod extension;
 
@@ -45,7 +45,8 @@ impl ParserProcedure for MarkdownParser {
             }
         })?;
 
-        let res = make_parser(&self.extensions).parse(data.body).into_result().map_err(|_e| anyhow!("Failed to parse markdown"))?;
+        let mut body = format!("\n\n\n{}", data.body.to_owned().trim_start());
+        let res = make_parser(&self.extensions).parse(&body).into_result().map_err(|_e| anyhow!("Failed to parse markdown"))?;
         let mut properties = properties.clone();
 
         properties.extend(data.headers);
@@ -55,22 +56,27 @@ impl ParserProcedure for MarkdownParser {
 }
 
 fn make_parser<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
-    block(extensions.clone())
-        .repeated()
-        .at_least(1)
-        .collect::<Vec<String>>()
-        .map(|elements| elements.concat())
+    recursive(|this| {
+        choice((
+            block(this.clone(), extensions.clone()),
+            inline(this.clone(), extensions.clone()),
+        ))
+            .repeated()
+            .at_least(1)
+            .collect::<Vec<String>>()
+            .map(|elements| elements.concat())
+    })
 }
 
-fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
+fn block<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
     recursive(|this| {
-        let inline = inline(this.clone(), extensions.clone());
+        let inline = inline(parser.clone(), extensions.clone());
         let mut block = choice((
             // headers
             inline.clone()
                 .nested_in(just("-# ")
                     .ignore_then(any()
-                        .and_is(just('\n').not())
+                        .and_is(line_terminator().not())
                         .repeated()
                         .at_least(1)
                         .to_slice()))
@@ -79,7 +85,7 @@ fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src st
             inline.clone()
                 .nested_in(just("### ")
                     .ignore_then(any()
-                        .and_is(just('\n').not())
+                        .and_is(line_terminator().not())
                         .repeated()
                         .at_least(1)
                         .to_slice()))
@@ -87,7 +93,7 @@ fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src st
             inline.clone()
                 .nested_in(just("## ")
                     .ignore_then(any()
-                        .and_is(just('\n').not())
+                        .and_is(line_terminator().not())
                         .repeated()
                         .at_least(1)
                         .to_slice()))
@@ -95,7 +101,7 @@ fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src st
             inline.clone()
                 .nested_in(just("# ")
                     .ignore_then(any()
-                        .and_is(just('\n').not())
+                        .and_is(line_terminator().not())
                         .repeated()
                         .at_least(1)
                         .to_slice()))
@@ -103,25 +109,28 @@ fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src st
         )).boxed();
 
         choice((
-            block.clone(),
+            block,
             // paragraph
             this.clone()
-                .nested_in(just("\n\n\n")
+                .nested_in(newline()
+                    .repeated()
+                    .at_least(3)
                     .ignore_then(any()
-                        .and_is(just("\n\n\n").not())
+                        .and_is(newline()
+                            .repeated()
+                            .at_least(3)
+                            .not())
                         .repeated()
                         .at_least(1)
                         .to_slice()))
                 .map(|s| format!("<p>{}</p>", s)),
             // line break
-            just("\n\n").to(format!("<br/>")),
-            // everything else
-            inline,
+            newline().repeated().at_least(2).to(format!("<br/>")),
         ))
     })
 }
 
-fn inline<'src>(block: Recursive<dyn Parser<'src, &'src str, String> + 'src>, extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
+fn inline<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
     recursive(|this| {
         let mut inline = choice((
             // image
@@ -168,7 +177,7 @@ fn inline<'src>(block: Recursive<dyn Parser<'src, &'src str, String> + 'src>, ex
                 }),
             // code block
             just("```")
-                .ignore_then(ident().then_ignore(just('\n')).or_not())
+                .ignore_then(ident().then_ignore(newline()).or_not())
                 .then(any()
                     .and_is(just("```").not())
                     .repeated()
@@ -197,11 +206,9 @@ fn inline<'src>(block: Recursive<dyn Parser<'src, &'src str, String> + 'src>, ex
                         .and_is(just("**").not())
                         .repeated()
                         .at_least(1)
-                        .collect::<String>()
                         .then(just('*')
                             .and_is(just("***"))
-                            .repeated()
-                            .collect::<String>())
+                            .repeated())
                         .to_slice())
                     .then_ignore(just("**")))
                 .map(|inner| format!("<b>{}</b>", inner)),
@@ -212,11 +219,9 @@ fn inline<'src>(block: Recursive<dyn Parser<'src, &'src str, String> + 'src>, ex
                         .and_is(just('*').not())
                         .repeated()
                         .at_least(1)
-                        .collect::<String>()
                         .then(just('*')
                             .and_is(just("**"))
-                            .repeated()
-                            .collect::<String>())
+                            .repeated())
                         .to_slice())
                     .then_ignore(just('*')))
                 .map(|inner| format!("<i>{}</i>", inner)),
@@ -227,11 +232,9 @@ fn inline<'src>(block: Recursive<dyn Parser<'src, &'src str, String> + 'src>, ex
                         .and_is(just("~~").not())
                         .repeated()
                         .at_least(1)
-                        .collect::<String>()
                         .then(just('~')
                             .and_is(just("~~~"))
-                            .repeated()
-                            .collect::<String>())
+                            .repeated())
                         .to_slice())
                     .then_ignore(just("~~")))
                 .map(|inner| format!("<s>{}</s>", inner)),
@@ -242,11 +245,9 @@ fn inline<'src>(block: Recursive<dyn Parser<'src, &'src str, String> + 'src>, ex
                         .and_is(just("__").not())
                         .repeated()
                         .at_least(1)
-                        .collect::<String>()
                         .then(just('_')
                             .and_is(just("___"))
-                            .repeated()
-                            .collect::<String>())
+                            .repeated())
                         .to_slice())
                     .then_ignore(just("__")))
                 .map(|inner| format!("<u>{}</u>", inner)),
@@ -258,13 +259,15 @@ fn inline<'src>(block: Recursive<dyn Parser<'src, &'src str, String> + 'src>, ex
                 .ignore_then(any()
                     .map(|c| format!("{}", c))),
             // manual wrapping
-            just('\n')
-                .and_is(just("\n\n").not())
-                .and_is(just('\n').then(block.clone()).not())
-                .and_is(block.not())
+            newline()
+                .and_is(newline()
+                    .repeated()
+                    .at_least(2)
+                    .not())
                 .to(format!("")),
             inline.clone(),
-            none_of("\n")
+            any()
+                .and_is(newline().not())
                 .and_is(inline.not())
                 .repeated()
                 .at_least(1)
@@ -284,11 +287,11 @@ mod tests {
     mod block {
         use chumsky::Parser;
 
-        use crate::parser::markdown::block;
+        use crate::parser::markdown::make_parser;
 
         #[test]
         fn header1() {
-            let p = block(vec![]);
+            let p = make_parser(&vec![]);
             let res = p.parse("# meow").into_result().unwrap();
             let expected = format!("<h1>meow</h1>");
 
@@ -297,7 +300,7 @@ mod tests {
 
         #[test]
         fn header2() {
-            let p = block(vec![]);
+            let p = make_parser(&vec![]);
             let res = p.parse("## meow").into_result().unwrap();
             let expected = format!("<h2>meow</h2>");
 
@@ -306,7 +309,7 @@ mod tests {
 
         #[test]
         fn header3() {
-            let p = block(vec![]);
+            let p = make_parser(&vec![]);
             let res = p.parse("### meow").into_result().unwrap();
             let expected = format!("<h3>meow</h3>");
 
@@ -315,7 +318,7 @@ mod tests {
 
         #[test]
         fn small() {
-            let p = block(vec![]);
+            let p = make_parser(&vec![]);
             let res = p.parse("-# meow").into_result().unwrap();
             let expected = format!("<br/><small>meow</small>");
 
@@ -324,7 +327,7 @@ mod tests {
 
         #[test]
         fn paragraph() {
-            let p = block(vec![]);
+            let p = make_parser(&vec![]);
             let res = p.parse("\n\n\nmeow").into_result().unwrap();
             let expected = format!("<p>meow</p>");
 
@@ -333,7 +336,7 @@ mod tests {
 
         #[test]
         fn paragraph_with_bold_and_italics() {
-            let p = block(vec![]);
+            let p = make_parser(&vec![]);
             let res = p.parse("\n\n\n***meow***").into_result().unwrap();
             let expected = format!("<p><b><i>meow</i></b></p>");
 
@@ -344,11 +347,11 @@ mod tests {
     mod inline {
         use chumsky::Parser;
 
-        use crate::parser::markdown::block;
+        use crate::parser::markdown::make_parser;
 
         #[test]
         fn image_embed() {
-            let p = block(vec![]);
+            let p = make_parser(&vec![]);
             let res = p.parse("![this is an image](https://it.is.from.here)").into_result().unwrap();
             let expected = format!("<img src=\"https://it.is.from.here\" alt=\"this is an image\"/>");
 
@@ -357,7 +360,7 @@ mod tests {
 
         #[test]
         fn link_embed() {
-            let p = block(vec![]);
+            let p = make_parser(&vec![]);
             let res = p.parse("[this is a link](https://it.goes.here)").into_result().unwrap();
             let expected = format!("<a href=\"https://it.goes.here\">this is a link</a>");
 
@@ -366,7 +369,7 @@ mod tests {
 
         #[test]
         fn code_block() {
-            let p = block(vec![]);
+            let p = make_parser(&vec![]);
             let res = p.parse("```meow```").into_result().unwrap();
             let expected = format!("<pre><code>meow</code></pre>");
 
@@ -375,7 +378,7 @@ mod tests {
 
         #[test]
         fn code_line() {
-            let p = block(vec![]);
+            let p = make_parser(&vec![]);
             let res = p.parse("`meow`").into_result().unwrap();
             let expected = format!("<code>meow</code>");
 
@@ -384,7 +387,7 @@ mod tests {
 
         #[test]
         fn bold() {
-            let p = block(vec![]);
+            let p = make_parser(&vec![]);
             let res = p.parse("**meow**").into_result().unwrap();
             let expected = format!("<b>meow</b>");
 
@@ -393,7 +396,7 @@ mod tests {
 
         #[test]
         fn italic() {
-            let p = block(vec![]);
+            let p = make_parser(&vec![]);
             let res = p.parse("*meow*").into_result().unwrap();
             let expected = format!("<i>meow</i>");
 
@@ -402,7 +405,7 @@ mod tests {
 
         #[test]
         fn bold_and_italic() {
-            let p = block(vec![]);
+            let p = make_parser(&vec![]);
             let res = p.parse("***meow***").into_result().unwrap();
             let expected = format!("<b><i>meow</i></b>");
 
@@ -411,7 +414,7 @@ mod tests {
 
         #[test]
         fn strikethrough() {
-            let p = block(vec![]);
+            let p = make_parser(&vec![]);
             let res = p.parse("~~meow~~").into_result().unwrap();
             let expected = format!("<s>meow</s>");
 
@@ -420,7 +423,7 @@ mod tests {
 
         #[test]
         fn underline() {
-            let p = block(vec![]);
+            let p = make_parser(&vec![]);
             let res = p.parse("__meow__").into_result().unwrap();
             let expected = format!("<u>meow</u>");
 
