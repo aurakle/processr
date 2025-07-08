@@ -125,7 +125,14 @@ fn block<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, ex
                         .to_slice()))
                 .map(|s| format!("<p>{}</p>", s)),
             // line break
-            newline().repeated().at_least(2).to(format!("<br/>")),
+            newline().repeated().exactly(2).to(format!("<br/>")),
+            // manual wrapping
+            // TODO: this doesn't work with *** some text \n more text ***
+            // because it breaks up the inline parser
+            newline()
+                .repeated()
+                .exactly(1)
+                .to(format!("")),
         ))
     })
 }
@@ -258,13 +265,6 @@ fn inline<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, e
             just("\\")
                 .ignore_then(any()
                     .map(|c| format!("{}", c))),
-            // manual wrapping
-            newline()
-                .and_is(newline()
-                    .repeated()
-                    .at_least(2)
-                    .not())
-                .to(format!("")),
             inline.clone(),
             any()
                 .and_is(newline().not())
