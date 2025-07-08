@@ -57,6 +57,7 @@ impl ParserProcedure for MarkdownParser {
 fn make_parser<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
     block(extensions.clone())
         .repeated()
+        .at_least(1)
         .collect::<Vec<String>>()
         .map(|elements| elements.concat())
 }
@@ -342,6 +343,24 @@ mod tests {
         use chumsky::Parser;
 
         use crate::parser::markdown::block;
+
+        #[test]
+        fn image_embed() {
+            let p = block(vec![]);
+            let res = p.parse("![this is an image](https://it.is.from.here)").into_result().unwrap();
+            let expected = format!("<img src=\"https://it.is.from.here\" alt=\"this is an image\"/>");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
+        fn link_embed() {
+            let p = block(vec![]);
+            let res = p.parse("[this is a link](https://it.goes.here)").into_result().unwrap();
+            let expected = format!("<a href=\"https://it.goes.here\">this is a link</a>");
+
+            assert_eq!(expected, res);
+        }
 
         #[test]
         fn code_block() {
