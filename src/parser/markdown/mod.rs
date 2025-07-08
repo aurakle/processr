@@ -115,10 +115,6 @@ fn block<'src>(extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src st
                 .map(|s| format!("<p>{}</p>", s)),
             // line break
             just("\n\n").to(format!("<br/>")),
-            // manual wrapping
-            just('\n')
-                .and_is(block.not())
-                .to(format!("")),
             // everything else
             inline,
         ))
@@ -261,6 +257,12 @@ fn inline<'src>(block: Recursive<dyn Parser<'src, &'src str, String> + 'src>, ex
             just("\\")
                 .ignore_then(any()
                     .map(|c| format!("{}", c))),
+            // manual wrapping
+            just('\n')
+                .and_is(just("\n\n").not())
+                .and_is(just('\n').then(block.clone()).not())
+                .and_is(block.not())
+                .to(format!("")),
             inline.clone(),
             none_of("\n")
                 .and_is(inline.not())
