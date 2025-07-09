@@ -25,8 +25,9 @@ impl Item {
         fs::create_dir_all(cache.clone())?;
 
         for (filename, bytes) in self.cache.iter() {
-            let path = cache.join(filename);
-            println!("Writing cached file {}", path.display());
+            let path = cache.join(filename.clone());
+
+            println!("Writing cached file {}", filename);
             fs::write(path, bytes.as_slice())?;
         }
 
@@ -89,8 +90,9 @@ impl Item {
 
     pub fn insert_into_cache(&mut self, filename: String, bytes: Vec<u8>) -> String {
         let hasher = Sha512::new();
-        let hash = hasher.digest(bytes.as_slice());
-        let filename = format!("{}-{}", hash, filename);
+        let filename_hash = hasher.digest(filename);
+        let contents_hash = hasher.digest(bytes.as_slice());
+        let filename = format!("{}-{}", filename_hash, contents_hash);
         self.cache.insert(filename.clone(), bytes);
 
         format!("/.cache/{}", filename)
