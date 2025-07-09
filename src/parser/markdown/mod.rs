@@ -35,7 +35,7 @@ impl MarkdownParser {
 }
 
 impl ParserProcedure for MarkdownParser {
-    fn process(&self, item: &Item) -> Result<(Vec<u8>, HashMap<String, Value>)> {
+    fn process(&self, item: &Item) -> Result<Item> {
         let text = String::from_utf8(item.bytes.clone())?;
         let data = parse::<HashMap<String, Value>>(&text).map_err(|e| {
             match e {
@@ -51,7 +51,11 @@ impl ParserProcedure for MarkdownParser {
         let mut properties = item.properties.clone();
         properties.extend(data.headers);
 
-        Ok((res.as_bytes().to_vec(), properties))
+        Ok(Item {
+            bytes: res.as_bytes().to_vec(),
+            properties,
+            ..item.clone()
+        })
     }
 }
 

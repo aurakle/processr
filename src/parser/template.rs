@@ -17,12 +17,15 @@ impl TemplateParser {
 }
 
 impl ParserProcedure for TemplateParser {
-    fn process(&self, item: &Item) -> Result<(Vec<u8>, HashMap<String, Value>)> {
+    fn process(&self, item: &Item) -> Result<Item> {
         let text = String::from_utf8(item.bytes.clone())?;
         let parser = make_parser(item.properties.clone());
         let text = parser.parse(text.as_str()).into_result().map_err(|_e| anyhow!("Failed to parse markdown"))?;
 
-        Ok((text.as_bytes().to_vec(), item.properties.clone()))
+        Ok(Item {
+            bytes: text.as_bytes().to_vec(),
+            ..item.clone()
+        })
     }
 }
 

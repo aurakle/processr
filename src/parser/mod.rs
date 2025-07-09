@@ -7,10 +7,11 @@ use crate::data::{Item, Value};
 
 pub mod markdown;
 pub mod template;
+pub mod html;
 pub mod css;
 
 pub trait ParserProcedure: Clone {
-    fn process(&self, item: &Item) -> Result<(Vec<u8>, HashMap<String, Value>)>;
+    fn process(&self, item: &Item) -> Result<Item>;
 }
 
 fn whitespace<'src>() -> impl Parser<'src, &'src str, ()> + Clone {

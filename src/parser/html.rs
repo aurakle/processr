@@ -1,0 +1,125 @@
+use std::{collections::HashMap, path::{Path, PathBuf}};
+
+use dom_query::{Document, Selection};
+use pathdiff::diff_paths;
+use anyhow::Result;
+
+use crate::{data::{Item, Value}, error::FsError};
+
+use super::ParserProcedure;
+
+#[derive(Clone)]
+pub struct HtmlParser {
+    relativize_urls: bool,
+    cache_linked_resources: bool,
+}
+
+impl HtmlParser {
+    pub fn default() -> Self {
+        Self {
+            relativize_urls: false,
+            cache_linked_resources: false,
+        }
+    }
+
+    pub fn relativize_urls(self) -> Self {
+        Self {
+            relativize_urls: true,
+            ..self
+        }
+    }
+
+    fn apply<'a>(&self, item: &mut Item, attr: &str, target: Selection<'a>) -> Result<()> {
+        if let Some(link) = target.attr(attr) {
+            let link = link.to_string();
+            let new_link = {
+                if link.starts_with("http://") || link.starts_with("https://") {
+                    if self.cache_linked_resources && target.filter("*:not(a)").exists() {
+                        let response = reqwest::blocking::get(link.clone())?;
+                        let bytes = response.bytes()?;
+                        let file = item.insert_into_cache(link, bytes.to_vec());
+
+                        if self.relativize_urls {
+                            Self::relativize(item, PathBuf::from(file.clone()))?.unwrap_or(file)
+                        } else {
+                            file
+                        }
+                    } else {
+                        link
+                    }
+                } else {
+                    let path = PathBuf::from(link.clone());
+
+                    if self.relativize_urls && path.is_absolute() {
+                        Self::relativize(item, path)?.unwrap_or(link)
+                    } else {
+                        link
+                    }
+                }
+            };
+
+            target.set_attr(attr, &new_link);
+        }
+
+        Ok(())
+    }
+
+    fn relativize(item: &Item, path: PathBuf) -> Result<Option<String>> {
+        if let Some(relative_path) = item.path.parent().and_then(|current_dir| diff_paths(path, current_dir)) {
+            Ok(Some(relative_path
+                .as_os_str()
+                .to_str()
+                .ok_or(FsError::OsStringNotUtf8)?
+                .to_owned()))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+impl ParserProcedure for HtmlParser {
+    fn process(&self, item: &Item) -> Result<Item> {
+        let mut item = item.clone();
+        let mut document = Document::from(String::from_utf8(item.bytes.clone())?);
+        document.normalize();
+
+        let href_targets = document.select("*[href]:not([href=\"\"])").iter();
+
+        for target in href_targets {
+            self.apply(&mut item, "href", target)?;
+        }
+
+        let src_targets = document.select("*[src]:not([src=\"\"])").iter();
+
+        for target in src_targets {
+            self.apply(&mut item, "src", target)?;
+        }
+
+        item.bytes = document.html().to_string().as_bytes().to_vec();
+        Ok(item)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::HashMap, path::PathBuf};
+
+    use crate::{data::Item, parser::ParserProcedure};
+
+    use super::HtmlParser;
+
+    #[test]
+    fn relativize() {
+        let p = HtmlParser::default().relativize_urls();
+        let res = p.process(&Item {
+            path: PathBuf::from("/posts/thing1.html"),
+            bytes: b"<html lang=\"en\"><head><link rel=\"stylesheet\" href=\"/css/default.css\"></head><body><img src=\"/images/profile.png\"></body></html>".to_vec(),
+            properties: HashMap::new(),
+            cache: HashMap::new(),
+        }).unwrap().bytes;
+        let res = String::from_utf8(res).unwrap();
+        let expected = format!("<html lang=\"en\"><head><link rel=\"stylesheet\" href=\"../css/default.css\"></head><body><img src=\"../images/profile.png\"></body></html>");
+
+        assert_eq!(expected, res);
+    }
+}

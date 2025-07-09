@@ -166,8 +166,7 @@ impl<P: SingleProcedure> SingleProcedure for SetDirectory<P> {
 
         Ok(Item {
             path: new_path.as_path().into(),
-            bytes: item.bytes.clone(),
-            properties: item.properties.clone(),
+            ..item.clone()
         })
     }
 }
@@ -185,8 +184,7 @@ impl<P: SingleProcedure> SingleProcedure for SetExtension<P> {
 
         Ok(Item {
             path,
-            bytes: item.bytes.clone(),
-            properties: item.properties.clone(),
+            ..item.clone()
         })
     }
 }
@@ -200,15 +198,10 @@ pub struct Parse<P: SingleProcedure, PARSER: ParserProcedure> {
 impl<P: SingleProcedure, PARSER: ParserProcedure> SingleProcedure for Parse<P, PARSER> {
     fn eval(&self) -> Result<Item> {
         let item = self.prior.eval()?;
-        let (bytes, properties) = self.parser
-            .process(&item)
-            .context(format!("While parsing {}", item.path.display()))?;
 
-        Ok(Item {
-            path: item.path.clone(),
-            bytes,
-            properties,
-        })
+        self.parser
+            .process(&item)
+            .context(format!("While parsing {}", item.path.display()))
     }
 }
 
@@ -224,16 +217,17 @@ impl<P: SingleProcedure, T: SingleProcedure> SingleProcedure for ApplyTemplate<P
         let template = self.template.eval()?;
         let mut properties = template.properties.clone();
         properties.extend(item.properties_with_url_and_body()?);
+        let mut cache = template.cache.clone();
+        cache.extend(item.cache.clone());
 
-        let (bytes, properties) = TemplateParser::default()
-            .process(&Item { properties, ..template.clone() })
-            .context(format!("While applying template {}", template.path.display()))?;
-
-        Ok(Item {
-            path: item.path.clone(),
-            bytes,
-            properties,
-        })
+        TemplateParser::default()
+            .process(&Item {
+                path: item.path.clone(),
+                bytes: template.bytes.clone(),
+                properties,
+                cache
+            })
+            .context(format!("While applying template {}", template.path.display()))
     }
 }
 

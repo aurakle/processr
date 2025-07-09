@@ -85,6 +85,7 @@ pub fn create(path: &str) -> Item {
         path: PathBuf::from(path),
         bytes: Vec::new(),
         properties: HashMap::new(),
+        cache: HashMap::new(),
     }
 }
 

@@ -9,12 +9,16 @@ actix-web = "4.11.0"
 anyhow = "1.0.98"
 chumsky = "0.10.1"
 clap = { version = "4.5.40", features = ["derive"] }
+dom_query = "0.19.2"
 fronma = "0.2.0"
 html-escape = "0.2.13"
 lightningcss = { version = "1.0.0-alpha.67" }
+pathdiff = "0.2.3"
 rand = "0.9.1"
 regex = "1.11.1"
+reqwest = { version = "0.12.22", features = ["blocking"] }
 serde = { version = "1.0.219", features = ["derive"] }
+sha-rs = "0.1.0"
 thiserror = "2.0.12"
 time = "0.3.41"
 wildmatch = "2.4.0"

@@ -2,6 +2,7 @@ use std::{collections::HashMap, env, fs, path::{Path, PathBuf}};
 
 use anyhow::{anyhow, Result};
 use serde::Deserialize;
+use sha_rs::{Sha, Sha256, Sha512};
 
 use crate::{error::FsError, prelude::SingleProcedure};
 
@@ -10,14 +11,22 @@ pub struct Item {
     pub path: PathBuf,
     pub bytes: Vec<u8>,
     pub properties: HashMap<String, Value>,
+    pub cache: HashMap<String, Vec<u8>>,
 }
 
 impl Item {
     pub fn write(&self, root: &str) -> Result<()> {
         let pwd = env::current_dir()?;
-        let path = pwd.join(root).join(self.path.clone());
+        let root = pwd.join(root);
+        let path = root.join(self.path.clone());
 
-        fs::create_dir_all(path.parent().unwrap_or(&pwd))?;
+        fs::create_dir_all(path.parent().unwrap_or(&root))?;
+
+        for (filename, bytes) in self.cache.iter() {
+            let path = root.join(format!(".cache/{}", filename));
+            fs::write(path, bytes.as_slice())?
+        }
+
         Ok(fs::write(path, self.bytes.as_slice())?)
     }
 
@@ -26,6 +35,7 @@ impl Item {
             path: PathBuf::from(path.strip_prefix(env::current_dir()?).unwrap_or(&path)),
             bytes: fs::read(path)?,
             properties: HashMap::new(),
+            cache: HashMap::new(),
         })
     }
 
@@ -35,17 +45,15 @@ impl Item {
         properties.insert(key.into(), value.into());
 
         Self {
-            path: self.path.clone(),
-            bytes: self.bytes.clone(),
             properties,
+            ..self.clone()
         }
     }
 
     pub fn set_path(&self, path: PathBuf) -> Self {
         Self {
             path,
-            bytes: self.bytes.clone(),
-            properties: self.properties.clone(),
+            ..self.clone()
         }
     }
 
@@ -70,6 +78,15 @@ impl Item {
 
     pub fn into_meta(&self) -> Result<Value> {
         self.properties_with_url_and_body().map(|props| Value::from(props))
+    }
+
+    pub fn insert_into_cache(&mut self, filename: String, bytes: Vec<u8>) -> String {
+        let hasher = Sha512::new();
+        let hash = hasher.digest(bytes.as_slice());
+        let filename = format!("{}-{}", hash, filename);
+        self.cache.insert(filename.clone(), bytes);
+
+        format!("/.cache/{}", filename)
     }
 }
 
