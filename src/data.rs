@@ -26,7 +26,8 @@ impl Item {
 
         for (filename, bytes) in self.cache.iter() {
             let path = cache.join(filename);
-            fs::write(path, bytes.as_slice())?
+            println!("Writing cached file {}", path.display());
+            fs::write(path, bytes.as_slice())?;
         }
 
         if let Some(p) = path.parent() {
