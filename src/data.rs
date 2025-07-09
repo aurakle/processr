@@ -19,9 +19,11 @@ impl Item {
     pub fn write(&self, root: &str) -> Result<()> {
         let pwd = env::current_dir()?;
         let root = pwd.join(root);
+        let cache = root.join(".cache");
         let path = root.join(self.path.clone());
 
         fs::create_dir_all(path.parent().unwrap_or(&root))?;
+        fs::create_dir_all(cache)?;
 
         for (filename, bytes) in self.cache.iter() {
             let path = root.join(format!(".cache/{}", filename));
