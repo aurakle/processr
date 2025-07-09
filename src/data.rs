@@ -42,7 +42,7 @@ impl Item {
 
     pub fn from_file(path: &PathBuf) -> Result<Self> {
         Ok(Self {
-            path: PathBuf::from("/").join(PathBuf::from(path.strip_prefix(env::current_dir()?).unwrap_or(&path))),
+            path: PathBuf::from(path.strip_prefix(env::current_dir()?).unwrap_or(&path)),
             bytes: fs::read(path)?,
             properties: HashMap::new(),
             cache: HashMap::new(),
@@ -80,7 +80,7 @@ impl Item {
     pub fn properties_with_url_and_body(&self) -> Result<HashMap<String, Value>> {
         let mut props = self.properties.clone();
 
-        props.insert(format!("url"), Value::from(self.path.as_os_str().to_str().ok_or(anyhow!("File path {} is not valid UTF-8", self.path.display()))?));
+        props.insert(format!("url"), Value::from(format!("/{}", self.path.as_os_str().to_str().ok_or(anyhow!("File path {} is not valid UTF-8", self.path.display()))?)));
         props.insert(format!("body"), Value::from(String::from_utf8(self.bytes.clone())?));
 
         Ok(props)
