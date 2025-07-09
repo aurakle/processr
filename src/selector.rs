@@ -1,5 +1,6 @@
 use std::{env, fs, path::{Path, PathBuf}};
 
+use async_trait::async_trait;
 use regex::Regex;
 use anyhow::{Context, Result};
 use wildmatch::WildMatch;
@@ -9,8 +10,9 @@ use crate::{error::FsError, procedure::SingleProcedure, Item};
 #[derive(Clone)]
 pub struct Selector(PathBuf);
 
+#[async_trait(?Send)]
 impl SingleProcedure for Selector {
-    fn eval(&self) -> Result<Item> {
+    async fn eval(&self) -> Result<Item> {
         Item::from_file(&self.0)
     }
 }

@@ -2,6 +2,7 @@ use std::path::Path;
 use std::{env, path::PathBuf};
 
 use anyhow::{bail, Context, Result};
+use async_trait::async_trait;
 use time::macros::format_description;
 use time::{format_description, Date};
 use crate::data::Value;
@@ -11,12 +12,14 @@ use crate::parser::{template::TemplateParser, ParserProcedure};
 use crate::selector;
 use crate::Item;
 
+#[async_trait(?Send)]
 pub trait Procedure: Sized + Clone {
-    fn write(&self, out: &str) -> Result<()>;
+    async fn write(&self, out: &str) -> Result<()>;
 }
 
+#[async_trait(?Send)]
 pub trait SingleProcedure: Procedure + Sized + Clone {
-    fn eval(&self) -> Result<Item>;
+    async fn eval(&self) -> Result<Item>;
 
     fn property<S: Into<String>>(self, key: S, value: Value) -> SetProperty<Self> {
         SetProperty {
@@ -80,6 +83,7 @@ pub trait SingleProcedure: Procedure + Sized + Clone {
     }
 }
 
+#[async_trait(?Send)]
 pub trait MultiProcedure<P: SingleProcedure>: Procedure + Sized + Clone {
     fn chain<O, F>(self, func: F) -> impl MultiProcedure<O>
     where
@@ -87,25 +91,28 @@ pub trait MultiProcedure<P: SingleProcedure>: Procedure + Sized + Clone {
         F: Fn(P) -> O,
     ;
 
-    fn into_meta(&self) -> Result<Value>;
+    async fn into_meta(&self) -> Result<Value>;
 }
 
+#[async_trait(?Send)]
 impl<P: SingleProcedure> Procedure for P {
-    fn write(&self, out: &str) -> Result<()> {
-        self.eval()?.write(out)
+    async fn write(&self, out: &str) -> Result<()> {
+        self.eval().await?.write(out)
     }
 }
 
+#[async_trait(?Send)]
 impl<P: SingleProcedure> Procedure for Vec<P> {
-    fn write(&self, out: &str) -> Result<()> {
+    async fn write(&self, out: &str) -> Result<()> {
         for p in self {
-            p.write(out)?;
+            p.write(out).await?;
         }
 
         Ok(())
     }
 }
 
+#[async_trait(?Send)]
 impl<P: SingleProcedure> MultiProcedure<P> for Vec<P> {
     fn chain<O, F>(self, func: F) -> impl MultiProcedure<O>
     where
@@ -121,11 +128,11 @@ impl<P: SingleProcedure> MultiProcedure<P> for Vec<P> {
         result
     }
 
-    fn into_meta(&self) -> Result<Value> {
+    async fn into_meta(&self) -> Result<Value> {
         let mut result = Vec::new();
 
         for p in self {
-           result.push(p.eval()?.into_meta()?);
+           result.push(p.eval().await?.into_meta()?);
         }
 
         Ok(Value::from(result))
@@ -139,9 +146,10 @@ pub struct SetProperty<P: SingleProcedure> {
     value: Value,
 }
 
+#[async_trait(?Send)]
 impl<P: SingleProcedure> SingleProcedure for SetProperty<P> {
-    fn eval(&self) -> Result<Item> {
-        Ok(self.prior.eval()?.set_property(self.key.clone(), self.value.clone()))
+    async fn eval(&self) -> Result<Item> {
+        Ok(self.prior.eval().await?.set_property(self.key.clone(), self.value.clone()))
     }
 }
 
@@ -151,9 +159,10 @@ pub struct SetDirectory<P: SingleProcedure> {
     dir: PathBuf,
 }
 
+#[async_trait(?Send)]
 impl<P: SingleProcedure> SingleProcedure for SetDirectory<P> {
-    fn eval(&self) -> Result<Item> {
-        let item = self.prior.eval()?;
+    async fn eval(&self) -> Result<Item> {
+        let item = self.prior.eval().await?;
 
         let file_name = match item.path.file_name() {
             Some(v) => v,
@@ -177,9 +186,10 @@ pub struct SetExtension<P: SingleProcedure> {
     extension: String,
 }
 
+#[async_trait(?Send)]
 impl<P: SingleProcedure> SingleProcedure for SetExtension<P> {
-    fn eval(&self) -> Result<Item> {
-        let item = self.prior.eval()?;
+    async fn eval(&self) -> Result<Item> {
+        let item = self.prior.eval().await?;
         let path = item.path.with_extension(self.extension.clone()).clone();
 
         Ok(Item {
@@ -195,12 +205,14 @@ pub struct Parse<P: SingleProcedure, PARSER: ParserProcedure> {
     parser: PARSER,
 }
 
+#[async_trait(?Send)]
 impl<P: SingleProcedure, PARSER: ParserProcedure> SingleProcedure for Parse<P, PARSER> {
-    fn eval(&self) -> Result<Item> {
-        let item = self.prior.eval()?;
+    async fn eval(&self) -> Result<Item> {
+        let item = self.prior.eval().await?;
 
         self.parser
             .process(&item)
+            .await
             .context(format!("While parsing {}", item.path.display()))
     }
 }
@@ -211,10 +223,11 @@ pub struct ApplyTemplate<P: SingleProcedure, T: SingleProcedure> {
     template: T,
 }
 
+#[async_trait(?Send)]
 impl<P: SingleProcedure, T: SingleProcedure> SingleProcedure for ApplyTemplate<P, T> {
-    fn eval(&self) -> Result<Item> {
-        let item = self.prior.eval()?;
-        let template = self.template.eval()?;
+    async fn eval(&self) -> Result<Item> {
+        let item = self.prior.eval().await?;
+        let template = self.template.eval().await?;
         let mut properties = template.properties.clone();
         properties.extend(item.properties_with_url_and_body()?);
         let mut cache = template.cache.clone();
@@ -227,6 +240,7 @@ impl<P: SingleProcedure, T: SingleProcedure> SingleProcedure for ApplyTemplate<P
                 properties,
                 cache
             })
+            .await
             .context(format!("While applying template {}", template.path.display()))
     }
 }
@@ -237,9 +251,10 @@ pub struct LoadAndApplyTemplate<P: SingleProcedure> {
     path: String,
 }
 
+#[async_trait(?Send)]
 impl<P: SingleProcedure> SingleProcedure for LoadAndApplyTemplate<P> {
-    fn eval(&self) -> Result<Item> {
-        self.prior.clone().apply(selector::exact(&self.path).context(format!("While loading template {}", self.path))?).eval()
+    async fn eval(&self) -> Result<Item> {
+        self.prior.clone().apply(selector::exact(&self.path).context(format!("While loading template {}", self.path))?).eval().await
     }
 }
 
@@ -249,9 +264,10 @@ pub struct LoadDate<P: SingleProcedure> {
     format: &'static [time::format_description::BorrowedFormatItem<'static>],
 }
 
+#[async_trait(?Send)]
 impl<P: SingleProcedure> SingleProcedure for LoadDate<P> {
-    fn eval(&self) -> Result<Item> {
-        let item = self.prior.eval()?;
+    async fn eval(&self) -> Result<Item> {
+        let item = self.prior.eval().await?;
         let file_name = item.get_filename()?;
 
         let parse_format = format_description!("[year]-[month]-[day]");
@@ -272,12 +288,13 @@ where
     func: F,
 }
 
+#[async_trait(?Send)]
 impl<P, F> SingleProcedure for Map<P, F>
 where
     P: SingleProcedure,
     F: Fn(Item) -> Result<Item> + Clone,
 {
-    fn eval(&self) -> Result<Item> {
-        (self.func)(self.prior.eval()?)
+    async fn eval(&self) -> Result<Item> {
+        (self.func)(self.prior.eval().await?)
     }
 }

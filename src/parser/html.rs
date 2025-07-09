@@ -1,5 +1,6 @@
 use std::{collections::HashMap, path::{Path, PathBuf}};
 
+use async_trait::async_trait;
 use dom_query::{Document, Selection};
 use pathdiff::diff_paths;
 use anyhow::Result;
@@ -36,14 +37,14 @@ impl HtmlParser {
         }
     }
 
-    fn apply<'a>(&self, item: &mut Item, attr: &str, target: Selection<'a>) -> Result<()> {
+    async fn apply<'a>(&self, item: &mut Item, attr: &str, target: Selection<'a>) -> Result<()> {
         if let Some(link) = target.attr(attr) {
             let link = link.to_string();
             let new_link = {
                 if link.starts_with("http://") || link.starts_with("https://") {
                     if self.cache_linked_resources && target.filter("*:not(a):not(link)").exists() {
-                        let response = reqwest::blocking::get(link.clone())?;
-                        let bytes = response.bytes()?;
+                        let response = reqwest::get(link.clone()).await?;
+                        let bytes = response.bytes().await?;
                         let file = item.insert_into_cache(link, bytes.to_vec());
 
                         if self.relativize_urls {
@@ -84,8 +85,9 @@ impl HtmlParser {
     }
 }
 
+#[async_trait(?Send)]
 impl ParserProcedure for HtmlParser {
-    fn process(&self, item: &Item) -> Result<Item> {
+    async fn process(&self, item: &Item) -> Result<Item> {
         let mut item = item.clone();
         let mut document = Document::from(String::from_utf8(item.bytes.clone())?);
         document.normalize();
@@ -93,13 +95,13 @@ impl ParserProcedure for HtmlParser {
         let href_targets = document.select("*[href]:not([href=\"\"])").iter();
 
         for target in href_targets {
-            self.apply(&mut item, "href", target)?;
+            self.apply(&mut item, "href", target).await?;
         }
 
         let src_targets = document.select("*[src]:not([src=\"\"])").iter();
 
         for target in src_targets {
-            self.apply(&mut item, "src", target)?;
+            self.apply(&mut item, "src", target).await?;
         }
 
         item.bytes = document.html().to_string().as_bytes().to_vec();
@@ -115,15 +117,15 @@ mod tests {
 
     use super::HtmlParser;
 
-    #[test]
-    fn relativize() {
+    #[actix_web::test]
+    async fn relativize() {
         let p = HtmlParser::default().relativize_urls();
         let res = p.process(&Item {
             path: PathBuf::from("/posts/thing1.html"),
             bytes: b"<html lang=\"en\"><head><link rel=\"stylesheet\" href=\"/css/default.css\"></head><body><img src=\"/images/profile.png\"></body></html>".to_vec(),
             properties: HashMap::new(),
             cache: HashMap::new(),
-        }).unwrap().bytes;
+        }).await.unwrap().bytes;
         let res = String::from_utf8(res).unwrap();
         let expected = format!("<html lang=\"en\"><head><link rel=\"stylesheet\" href=\"../css/default.css\"></head><body><img src=\"../images/profile.png\"></body></html>");
 

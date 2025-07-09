@@ -73,7 +73,7 @@ macro_rules! processr {
                 $crate::clean($out)?
             }
 
-            $(let $names = $rules; $crate::procedure::Procedure::write(&$names, $out)?;)+
+            $(let $names = $rules; $crate::procedure::Procedure::write(&$names, $out).await?;)+
 
             Ok(())
         }

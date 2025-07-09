@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use anyhow::{anyhow, Context, Result};
+use async_trait::async_trait;
 use lightningcss::{printer::PrinterOptions, stylesheet::{MinifyOptions, ParserOptions, StyleSheet}, targets::Targets};
 
 use crate::data::{Item, Value};
@@ -26,8 +27,9 @@ impl CssParser {
     }
 }
 
+#[async_trait(?Send)]
 impl ParserProcedure for CssParser {
-    fn process(&self, item: &Item) -> Result<Item> {
+    async fn process(&self, item: &Item) -> Result<Item> {
         let input = String::from_utf8(item.bytes.clone())?;
         let output = StyleSheet::parse(&input, ParserOptions { filename: item.get_filename()?, ..ParserOptions::default() })
             .map_err(|e| anyhow!("Parsing of css failed at {} due to {}", e.loc.map(|loc| loc.to_string()).unwrap_or("<unknown>".to_owned()), e.kind))?

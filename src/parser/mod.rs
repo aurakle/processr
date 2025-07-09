@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
+use async_trait::async_trait;
 use chumsky::{prelude::*, text::newline};
 
 use crate::data::{Item, Value};
@@ -10,8 +11,9 @@ pub mod template;
 pub mod html;
 pub mod css;
 
+#[async_trait(?Send)]
 pub trait ParserProcedure: Clone {
-    fn process(&self, item: &Item) -> Result<Item>;
+    async fn process(&self, item: &Item) -> Result<Item>;
 }
 
 fn whitespace<'src>() -> impl Parser<'src, &'src str, ()> + Clone {

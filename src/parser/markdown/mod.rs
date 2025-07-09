@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use chumsky::{prelude::*, text::{ident, newline}};
 use extension::{MarkdownExtension, MarkdownExtensionList};
 use fronma::parser::parse;
@@ -34,8 +35,9 @@ impl MarkdownParser {
     }
 }
 
+#[async_trait(?Send)]
 impl ParserProcedure for MarkdownParser {
-    fn process(&self, item: &Item) -> Result<Item> {
+    async fn process(&self, item: &Item) -> Result<Item> {
         let text = String::from_utf8(item.bytes.clone())?;
         let data = parse::<HashMap<String, Value>>(&text).map_err(|e| {
             match e {

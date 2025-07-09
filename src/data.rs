@@ -1,6 +1,7 @@
 use std::{collections::HashMap, env, fs, path::{Path, PathBuf}};
 
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use serde::Deserialize;
 use sha_rs::{Sha, Sha256, Sha512};
 
@@ -90,8 +91,9 @@ impl Item {
     }
 }
 
+#[async_trait(?Send)]
 impl SingleProcedure for Item {
-    fn eval(&self) -> Result<Item> {
+    async fn eval(&self) -> Result<Item> {
         Ok(self.clone())
     }
 }

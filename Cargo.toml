@@ -7,6 +7,7 @@ edition = "2021"
 actix-files = "0.6.6"
 actix-web = "4.11.0"
 anyhow = "1.0.98"
+async-trait = "0.1.88"
 chumsky = "0.10.1"
 clap = { version = "4.5.40", features = ["derive"] }
 dom_query = "0.19.2"

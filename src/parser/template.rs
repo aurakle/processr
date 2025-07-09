@@ -1,6 +1,7 @@
 use std::{collections::HashMap, env, fs};
 
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use chumsky::{prelude::*, text::{ident, keyword}};
 
 use crate::data::{Item, Value};
@@ -16,8 +17,9 @@ impl TemplateParser {
     }
 }
 
+#[async_trait(?Send)]
 impl ParserProcedure for TemplateParser {
-    fn process(&self, item: &Item) -> Result<Item> {
+    async fn process(&self, item: &Item) -> Result<Item> {
         let text = String::from_utf8(item.bytes.clone())?;
         let parser = make_parser(item.properties.clone());
         let text = parser.parse(text.as_str()).into_result().map_err(|_e| anyhow!("Failed to parse markdown"))?;
