@@ -7,6 +7,21 @@ use sha_rs::{Sha, Sha256, Sha512};
 
 use crate::{error::FsError, prelude::SingleProcedure};
 
+#[derive(Debug)]
+pub struct State {
+    pub root: PathBuf,
+    pub cached_resources: HashMap<String, String>,
+}
+
+impl State {
+    pub fn new(root: &str) -> Self {
+        Self {
+            root: PathBuf::from(root),
+            cached_resources: HashMap::new(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Item {
     pub path: PathBuf,
@@ -16,7 +31,7 @@ pub struct Item {
 }
 
 impl Item {
-    pub fn write(&self, root: &str) -> Result<()> {
+    pub fn write(&self, root: &Path) -> Result<()> {
         let pwd = env::current_dir()?;
         let root = pwd.join(root);
         let cache = root.join(".cache");
@@ -90,20 +105,22 @@ impl Item {
         self.properties_with_url_and_body().map(|props| Value::from(props))
     }
 
-    pub fn insert_into_cache(&mut self, filename: String, bytes: Vec<u8>, extension: Option<String>) -> String {
+    pub fn insert_into_cache(&mut self, state: &mut State, link: String, bytes: Vec<u8>, extension: Option<String>) -> String {
         let hasher = Sha256::new();
-        let filename_hash = hasher.digest(filename.as_bytes());
         let contents_hash = hasher.digest(bytes.as_slice());
-        let filename = format!("{}-{}-{}{}", filename_hash, contents_hash, bytes.len(), extension.map(|ext| format!(".{}", ext)).unwrap_or_else(String::new));
+        let filename = format!("{}-{}{}", contents_hash, bytes.len(), extension.map(|ext| format!(".{}", ext)).unwrap_or_else(String::new));
         self.cache.insert(filename.clone(), bytes);
 
-        format!("/.cache/{}", filename)
+        let filename = format!("/.cache/{}", filename);
+        state.cached_resources.insert(link, filename.clone());
+
+        filename
     }
 }
 
 #[async_trait(?Send)]
 impl SingleProcedure for Item {
-    async fn eval(&self) -> Result<Item> {
+    async fn eval(&self, state: &mut State) -> Result<Item> {
         Ok(self.clone())
     }
 }

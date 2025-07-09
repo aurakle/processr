@@ -5,14 +5,14 @@ use regex::Regex;
 use anyhow::{Context, Result};
 use wildmatch::WildMatch;
 
-use crate::{error::FsError, procedure::SingleProcedure, Item};
+use crate::{data::State, error::FsError, procedure::SingleProcedure, Item};
 
 #[derive(Clone)]
 pub struct Selector(PathBuf);
 
 #[async_trait(?Send)]
 impl SingleProcedure for Selector {
-    async fn eval(&self) -> Result<Item> {
+    async fn eval(&self, state: &mut State) -> Result<Item> {
         Item::from_file(&self.0)
     }
 }

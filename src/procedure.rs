@@ -5,7 +5,7 @@ use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use time::macros::format_description;
 use time::{format_description, Date};
-use crate::data::Value;
+use crate::data::{State, Value};
 use crate::error::FsError;
 use crate::parser::{template::TemplateParser, ParserProcedure};
 
@@ -14,12 +14,12 @@ use crate::Item;
 
 #[async_trait(?Send)]
 pub trait Procedure: Sized + Clone {
-    async fn write(&self, out: &str) -> Result<()>;
+    async fn write(&self, state: &mut State) -> Result<()>;
 }
 
 #[async_trait(?Send)]
 pub trait SingleProcedure: Procedure + Sized + Clone {
-    async fn eval(&self) -> Result<Item>;
+    async fn eval(&self, state: &mut State) -> Result<Item>;
 
     fn property<S: Into<String>>(self, key: S, value: Value) -> SetProperty<Self> {
         SetProperty {
@@ -91,21 +91,21 @@ pub trait MultiProcedure<P: SingleProcedure>: Procedure + Sized + Clone {
         F: Fn(P) -> O,
     ;
 
-    async fn into_meta(&self) -> Result<Value>;
+    async fn into_meta(&self, state: &mut State) -> Result<Value>;
 }
 
 #[async_trait(?Send)]
 impl<P: SingleProcedure> Procedure for P {
-    async fn write(&self, out: &str) -> Result<()> {
-        self.eval().await?.write(out)
+    async fn write(&self, state: &mut State) -> Result<()> {
+        self.eval(state).await?.write(&state.root)
     }
 }
 
 #[async_trait(?Send)]
 impl<P: SingleProcedure> Procedure for Vec<P> {
-    async fn write(&self, out: &str) -> Result<()> {
+    async fn write(&self, state: &mut State) -> Result<()> {
         for p in self {
-            p.write(out).await?;
+            p.write(state).await?;
         }
 
         Ok(())
@@ -128,11 +128,11 @@ impl<P: SingleProcedure> MultiProcedure<P> for Vec<P> {
         result
     }
 
-    async fn into_meta(&self) -> Result<Value> {
+    async fn into_meta(&self, state: &mut State) -> Result<Value> {
         let mut result = Vec::new();
 
         for p in self {
-           result.push(p.eval().await?.into_meta()?);
+           result.push(p.eval(state).await?.into_meta()?);
         }
 
         Ok(Value::from(result))
@@ -148,8 +148,8 @@ pub struct SetProperty<P: SingleProcedure> {
 
 #[async_trait(?Send)]
 impl<P: SingleProcedure> SingleProcedure for SetProperty<P> {
-    async fn eval(&self) -> Result<Item> {
-        Ok(self.prior.eval().await?.set_property(self.key.clone(), self.value.clone()))
+    async fn eval(&self, state: &mut State) -> Result<Item> {
+        Ok(self.prior.eval(state).await?.set_property(self.key.clone(), self.value.clone()))
     }
 }
 
@@ -161,8 +161,8 @@ pub struct SetDirectory<P: SingleProcedure> {
 
 #[async_trait(?Send)]
 impl<P: SingleProcedure> SingleProcedure for SetDirectory<P> {
-    async fn eval(&self) -> Result<Item> {
-        let item = self.prior.eval().await?;
+    async fn eval(&self, state: &mut State) -> Result<Item> {
+        let item = self.prior.eval(state).await?;
 
         let file_name = match item.path.file_name() {
             Some(v) => v,
@@ -188,8 +188,8 @@ pub struct SetExtension<P: SingleProcedure> {
 
 #[async_trait(?Send)]
 impl<P: SingleProcedure> SingleProcedure for SetExtension<P> {
-    async fn eval(&self) -> Result<Item> {
-        let item = self.prior.eval().await?;
+    async fn eval(&self, state: &mut State) -> Result<Item> {
+        let item = self.prior.eval(state).await?;
         let path = item.path.with_extension(self.extension.clone()).clone();
 
         Ok(Item {
@@ -207,11 +207,11 @@ pub struct Parse<P: SingleProcedure, PARSER: ParserProcedure> {
 
 #[async_trait(?Send)]
 impl<P: SingleProcedure, PARSER: ParserProcedure> SingleProcedure for Parse<P, PARSER> {
-    async fn eval(&self) -> Result<Item> {
-        let item = self.prior.eval().await?;
+    async fn eval(&self, state: &mut State) -> Result<Item> {
+        let item = self.prior.eval(state).await?;
 
         self.parser
-            .process(&item)
+            .process(state, &item)
             .await
             .context(format!("While parsing {}", item.path.display()))
     }
@@ -225,16 +225,16 @@ pub struct ApplyTemplate<P: SingleProcedure, T: SingleProcedure> {
 
 #[async_trait(?Send)]
 impl<P: SingleProcedure, T: SingleProcedure> SingleProcedure for ApplyTemplate<P, T> {
-    async fn eval(&self) -> Result<Item> {
-        let item = self.prior.eval().await?;
-        let template = self.template.eval().await?;
+    async fn eval(&self, state: &mut State) -> Result<Item> {
+        let item = self.prior.eval(state).await?;
+        let template = self.template.eval(state).await?;
         let mut properties = template.properties.clone();
         properties.extend(item.properties_with_url_and_body()?);
         let mut cache = template.cache.clone();
         cache.extend(item.cache.clone());
 
         TemplateParser::default()
-            .process(&Item {
+            .process(state, &Item {
                 path: item.path.clone(),
                 bytes: template.bytes.clone(),
                 properties,
@@ -253,8 +253,8 @@ pub struct LoadAndApplyTemplate<P: SingleProcedure> {
 
 #[async_trait(?Send)]
 impl<P: SingleProcedure> SingleProcedure for LoadAndApplyTemplate<P> {
-    async fn eval(&self) -> Result<Item> {
-        self.prior.clone().apply(selector::exact(&self.path).context(format!("While loading template {}", self.path))?).eval().await
+    async fn eval(&self, state: &mut State) -> Result<Item> {
+        self.prior.clone().apply(selector::exact(&self.path).context(format!("While loading template {}", self.path))?).eval(state).await
     }
 }
 
@@ -266,8 +266,8 @@ pub struct LoadDate<P: SingleProcedure> {
 
 #[async_trait(?Send)]
 impl<P: SingleProcedure> SingleProcedure for LoadDate<P> {
-    async fn eval(&self) -> Result<Item> {
-        let item = self.prior.eval().await?;
+    async fn eval(&self, state: &mut State) -> Result<Item> {
+        let item = self.prior.eval(state).await?;
         let file_name = item.get_filename()?;
 
         let parse_format = format_description!("[year]-[month]-[day]");
@@ -294,7 +294,7 @@ where
     P: SingleProcedure,
     F: Fn(Item) -> Result<Item> + Clone,
 {
-    async fn eval(&self) -> Result<Item> {
-        (self.func)(self.prior.eval().await?)
+    async fn eval(&self, state: &mut State) -> Result<Item> {
+        (self.func)(self.prior.eval(state).await?)
     }
 }

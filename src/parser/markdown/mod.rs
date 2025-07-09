@@ -6,7 +6,7 @@ use chumsky::{prelude::*, text::{ident, newline}};
 use extension::{MarkdownExtension, MarkdownExtensionList};
 use fronma::parser::parse;
 
-use crate::data::{Item, Value};
+use crate::data::{Item, State, Value};
 
 use super::{line_terminator, ParserProcedure};
 
@@ -37,7 +37,7 @@ impl MarkdownParser {
 
 #[async_trait(?Send)]
 impl ParserProcedure for MarkdownParser {
-    async fn process(&self, item: &Item) -> Result<Item> {
+    async fn process(&self, state: &mut State, item: &Item) -> Result<Item> {
         let text = String::from_utf8(item.bytes.clone())?;
         let data = parse::<HashMap<String, Value>>(&text).map_err(|e| {
             match e {

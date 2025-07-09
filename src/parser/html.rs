@@ -6,7 +6,7 @@ use mime_guess::get_extensions;
 use pathdiff::diff_paths;
 use anyhow::Result;
 
-use crate::{data::{Item, Value}, error::FsError};
+use crate::{data::{Item, State, Value}, error::FsError};
 
 use super::ParserProcedure;
 
@@ -38,27 +38,33 @@ impl HtmlParser {
         }
     }
 
-    async fn apply<'a>(&self, item: &mut Item, attr: &str, target: Selection<'a>) -> Result<()> {
+    async fn apply<'a>(&self, state: &mut State, item: &mut Item, attr: &str, target: Selection<'a>) -> Result<()> {
         if let Some(link) = target.attr(attr) {
             let link = link.to_string();
             let new_link = {
                 if link.starts_with("http://") || link.starts_with("https://") {
                     if self.cache_linked_resources && target.filter("*:not(a):not(link)").exists() {
-                        println!("Fetching resource at {} for caching", link.clone());
+                        let file = match state.cached_resources.get(&link) {
+                            Some(p) => p.clone(),
+                            None => {
+                                println!("Caching resource at {}", link.clone());
 
-                        let response = reqwest::get(link.clone()).await?;
-                        let extension = response
-                            .headers()
-                            .get("Content-Type")
-                            .and_then(|h| h.to_str().ok())
-                            .map(String::from)
-                            .and_then(|m| {
-                                let (left, right) = m.split_once("/")?;
-                                get_extensions(left, right)
-                            })
-                            .and_then(|exts| exts.to_vec().first().map(|ext| ext.to_owned().to_owned()));
-                        let bytes = response.bytes().await?;
-                        let file = item.insert_into_cache(link, bytes.to_vec(), extension);
+                                let response = reqwest::get(link.clone()).await?;
+                                let extension = response
+                                    .headers()
+                                    .get("Content-Type")
+                                    .and_then(|h| h.to_str().ok())
+                                    .map(String::from)
+                                    .and_then(|m| {
+                                        let (left, right) = m.split_once("/")?;
+                                        get_extensions(left, right)
+                                    })
+                                    .and_then(|exts| exts.to_vec().first().map(|ext| ext.to_owned().to_owned()));
+                                let bytes = response.bytes().await?;
+
+                                item.insert_into_cache(state, link, bytes.to_vec(), extension)
+                            },
+                        };
 
                         if self.relativize_urls {
                             Self::relativize(item, PathBuf::from(file.clone()))?.unwrap_or(file)
@@ -109,7 +115,7 @@ impl HtmlParser {
 
 #[async_trait(?Send)]
 impl ParserProcedure for HtmlParser {
-    async fn process(&self, item: &Item) -> Result<Item> {
+    async fn process(&self, state: &mut State, item: &Item) -> Result<Item> {
         let mut item = item.clone();
         let mut document = Document::from(String::from_utf8(item.bytes.clone())?);
         document.normalize();
@@ -117,13 +123,13 @@ impl ParserProcedure for HtmlParser {
         let href_targets = document.select("*[href]:not([href=\"\"])").iter();
 
         for target in href_targets {
-            self.apply(&mut item, "href", target).await?;
+            self.apply(state, &mut item, "href", target).await?;
         }
 
         let src_targets = document.select("*[src]:not([src=\"\"])").iter();
 
         for target in src_targets {
-            self.apply(&mut item, "src", target).await?;
+            self.apply(state, &mut item, "src", target).await?;
         }
 
         document.normalize();
@@ -136,14 +142,14 @@ impl ParserProcedure for HtmlParser {
 mod tests {
     use std::{collections::HashMap, path::PathBuf};
 
-    use crate::{data::Item, parser::ParserProcedure};
+    use crate::{data::{Item, State}, parser::ParserProcedure};
 
     use super::HtmlParser;
 
     #[actix_web::test]
     async fn relativize() {
         let p = HtmlParser::default().relativize_urls();
-        let res = p.process(&Item {
+        let res = p.process(&mut State::new("dist"), &Item {
             path: PathBuf::from("/posts/thing1.html"),
             bytes: b"<html lang=\"en\"><head><link rel=\"stylesheet\" href=\"/css/default.css\"></head><body><a href=\"/another/file.html\">Some link</a><img src=\"/images/profile.png\"></body></html>".to_vec(),
             properties: HashMap::new(),
@@ -158,7 +164,7 @@ mod tests {
     #[actix_web::test]
     async fn relativize_with_unapplied_caching() {
         let p = HtmlParser::default().relativize_urls().cache_linked_resources();
-        let res = p.process(&Item {
+        let res = p.process(&mut State::new("dist"), &Item {
             path: PathBuf::from("/posts/thing1.html"),
             bytes: b"<html lang=\"en\"><head><link rel=\"stylesheet\" href=\"/css/default.css\"></head><body><a href=\"/another/file.html\">Some link</a><img src=\"/images/profile.png\"></body></html>".to_vec(),
             properties: HashMap::new(),
