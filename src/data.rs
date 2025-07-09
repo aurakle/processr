@@ -28,7 +28,7 @@ impl Item {
             let path = cache.join(filename.clone());
 
             if !path.exists() {
-                println!("Writing cached file {}", filename);
+                println!("Writing cached resource {}", filename);
                 fs::write(path, bytes.as_slice())?;
             }
         }
