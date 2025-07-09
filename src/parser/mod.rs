@@ -29,3 +29,7 @@ fn line_terminator<'src>() -> impl Parser<'src, &'src str, ()> + Clone {
         end(),
     ))
 }
+
+fn fail<'src>() -> impl Parser<'src, &'src str, ()> + Clone {
+    end().and_is(end().not())
+}

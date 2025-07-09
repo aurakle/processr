@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
 use chumsky::{prelude::*, text::{ident, newline}};
-use extension::MarkdownExtension;
+use extension::{MarkdownExtension, MarkdownExtensionList};
 use fronma::parser::parse;
 
 use crate::data::Value;
@@ -72,20 +72,11 @@ fn make_parser<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &
 fn block<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
     recursive(|this| {
         let inline = inline(parser.clone(), this.clone().boxed(), extensions.clone());
-        let mut block = newline()
+        let block = newline()
             .repeated()
             .ignore_then(
                 choice((
                     // headers
-                    inline.clone()
-                        .nested_in(just("-# ")
-                            .ignore_then(any()
-                                .and_is(line_terminator().not())
-                                .repeated()
-                                .at_least(1)
-                                .to_slice()))
-                        //TODO: is the <br/> really necessary?
-                        .map(|s| format!("<br/><small>{}</small>", s)),
                     inline.clone()
                         .nested_in(just("### ")
                             .ignore_then(any()
@@ -110,6 +101,7 @@ fn block<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, ex
                                 .at_least(1)
                                 .to_slice()))
                         .map(|s| format!("<h1>{}</h1>", s)),
+                    extensions.build_block_parser(inline.clone().boxed()),
                 )))
             .boxed();
         let paragraph = recursive(|paragraph| {
@@ -144,7 +136,7 @@ fn block<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, ex
 
 fn inline<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, block: Boxed<'src, 'src, &'src str, String>, extensions: Vec<MarkdownExtension>) -> impl Parser<'src, &'src str, String> + Clone {
     recursive(|this| {
-        let mut inline = choice((
+        let inline = choice((
             // image
             just('!')
                 .ignore_then(
@@ -263,6 +255,7 @@ fn inline<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, b
                         .to_slice())
                     .then_ignore(just("__")))
                 .map(|inner| format!("<u>{}</u>", inner)),
+            extensions.build_inline_parser(this.boxed()),
         )).boxed();
 
         choice((
@@ -322,15 +315,6 @@ mod tests {
             let p = make_parser(&vec![]);
             let res = p.parse("### meow").into_result().unwrap();
             let expected = format!("<h3>meow</h3>");
-
-            assert_eq!(expected, res);
-        }
-
-        #[test]
-        fn small() {
-            let p = make_parser(&vec![]);
-            let res = p.parse("-# meow").into_result().unwrap();
-            let expected = format!("<br/><small>meow</small>");
 
             assert_eq!(expected, res);
         }
@@ -456,6 +440,26 @@ mod tests {
             let expected = format!("<u>meow</u>");
 
             assert_eq!(expected, res);
+        }
+    }
+
+    mod extensions {
+        use chumsky::Parser;
+
+        use crate::parser::markdown::{extension, make_parser};
+
+        #[test]
+        fn small() {
+            let p = make_parser(&vec![extension::small()]);
+            let res = p.parse("-# meow").into_result().unwrap();
+            let expected = format!("<br/><small>meow</small>");
+
+            assert_eq!(expected, res);
+        }
+
+        #[test]
+        fn wobbly() {
+            todo!()
         }
     }
 }
