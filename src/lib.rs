@@ -52,7 +52,7 @@ pub struct BuildArgs {
 
 #[macro_export]
 macro_rules! processr {
-    ($out:literal <- $state:ident : $($names:ident $rules:expr)+) => {
+    ($out:literal <- $state:ident { $($names:ident $rules:expr)+ }) => {
         #[::processr::actix_web::rt::main(system = "::processr::actix_web::rt::System")]
         async fn main() -> $crate::anyhow::Result<()> {
             match $crate::Cli::parse().command {
