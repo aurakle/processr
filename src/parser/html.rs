@@ -94,11 +94,13 @@ impl HtmlParser {
                 diff_paths(path, current_dir)
             })
         {
-            Ok(Some(relative_path
-                .as_os_str()
-                .to_str()
-                .ok_or(FsError::OsStringNotUtf8)?
-                .to_owned()))
+            Ok(Some(format!(
+                "./{}",
+                relative_path
+                    .as_os_str()
+                    .to_str()
+                    .ok_or(FsError::OsStringNotUtf8)?,
+            )))
         } else {
             Ok(None)
         }
@@ -124,6 +126,7 @@ impl ParserProcedure for HtmlParser {
             self.apply(&mut item, "src", target).await?;
         }
 
+        document.normalize();
         item.bytes = document.html().to_string().as_bytes().to_vec();
         Ok(item)
     }
@@ -147,7 +150,7 @@ mod tests {
             cache: HashMap::new(),
         }).await.unwrap().bytes;
         let res = String::from_utf8(res).unwrap();
-        let expected = format!("<html lang=\"en\"><head><link rel=\"stylesheet\" href=\"../css/default.css\"></head><body><a href=\"../another/file.html\">Some link</a><img src=\"../images/profile.png\"></body></html>");
+        let expected = format!("<html lang=\"en\"><head><link rel=\"stylesheet\" href=\"./../css/default.css\"></head><body><a href=\"./../another/file.html\">Some link</a><img src=\"./../images/profile.png\"></body></html>");
 
         assert_eq!(expected, res);
     }
@@ -162,7 +165,7 @@ mod tests {
             cache: HashMap::new(),
         }).await.unwrap().bytes;
         let res = String::from_utf8(res).unwrap();
-        let expected = format!("<html lang=\"en\"><head><link rel=\"stylesheet\" href=\"../css/default.css\"></head><body><a href=\"../another/file.html\">Some link</a><img src=\"../images/profile.png\"></body></html>");
+        let expected = format!("<html lang=\"en\"><head><link rel=\"stylesheet\" href=\"./../css/default.css\"></head><body><a href=\"./../another/file.html\">Some link</a><img src=\"./../images/profile.png\"></body></html>");
 
         assert_eq!(expected, res);
     }
