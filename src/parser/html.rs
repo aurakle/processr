@@ -122,12 +122,27 @@ mod tests {
         let p = HtmlParser::default().relativize_urls();
         let res = p.process(&Item {
             path: PathBuf::from("/posts/thing1.html"),
-            bytes: b"<html lang=\"en\"><head><link rel=\"stylesheet\" href=\"/css/default.css\"></head><body><img src=\"/images/profile.png\"></body></html>".to_vec(),
+            bytes: b"<html lang=\"en\"><head><link rel=\"stylesheet\" href=\"/css/default.css\"></head><body><a href=\"/another/file.html\">Some link</a><img src=\"/images/profile.png\"></body></html>".to_vec(),
             properties: HashMap::new(),
             cache: HashMap::new(),
         }).await.unwrap().bytes;
         let res = String::from_utf8(res).unwrap();
-        let expected = format!("<html lang=\"en\"><head><link rel=\"stylesheet\" href=\"../css/default.css\"></head><body><img src=\"../images/profile.png\"></body></html>");
+        let expected = format!("<html lang=\"en\"><head><link rel=\"stylesheet\" href=\"../css/default.css\"></head><body><a href=\"../another/file.html\">Some link</a><img src=\"../images/profile.png\"></body></html>");
+
+        assert_eq!(expected, res);
+    }
+
+    #[actix_web::test]
+    async fn relativize_with_unapplied_caching() {
+        let p = HtmlParser::default().relativize_urls().cache_linked_resources();
+        let res = p.process(&Item {
+            path: PathBuf::from("/posts/thing1.html"),
+            bytes: b"<html lang=\"en\"><head><link rel=\"stylesheet\" href=\"/css/default.css\"></head><body><a href=\"/another/file.html\">Some link</a><img src=\"/images/profile.png\"></body></html>".to_vec(),
+            properties: HashMap::new(),
+            cache: HashMap::new(),
+        }).await.unwrap().bytes;
+        let res = String::from_utf8(res).unwrap();
+        let expected = format!("<html lang=\"en\"><head><link rel=\"stylesheet\" href=\"../css/default.css\"></head><body><a href=\"../another/file.html\">Some link</a><img src=\"../images/profile.png\"></body></html>");
 
         assert_eq!(expected, res);
     }
