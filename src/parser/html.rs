@@ -90,7 +90,7 @@ impl HtmlParser {
             .map(|p| PathBuf::from("/")
                 .join(p))
             .and_then(|current_dir| {
-                println!("Attempting to make {} relative to {}", path.display(), current_dir.display());
+                println!("Making {} relative to {}", path.display(), current_dir.display());
                 diff_paths(path, current_dir)
             })
         {
