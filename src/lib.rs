@@ -80,7 +80,7 @@ macro_rules! processr {
 
 pub fn create(path: &str) -> Item {
     Item {
-        path: PathBuf::from(path),
+        path: PathBuf::from("/").join(path),
         bytes: Vec::new(),
         properties: HashMap::new(),
         cache: HashMap::new(),

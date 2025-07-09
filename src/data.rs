@@ -42,7 +42,7 @@ impl Item {
 
     pub fn from_file(path: &PathBuf) -> Result<Self> {
         Ok(Self {
-            path: PathBuf::from(path.strip_prefix(env::current_dir()?).unwrap_or(&path)),
+            path: PathBuf::from("/").join(PathBuf::from(path.strip_prefix(env::current_dir()?).unwrap_or(&path))),
             bytes: fs::read(path)?,
             properties: HashMap::new(),
             cache: HashMap::new(),
