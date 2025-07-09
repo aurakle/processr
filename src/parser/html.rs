@@ -29,6 +29,13 @@ impl HtmlParser {
         }
     }
 
+    pub fn cache_linked_resources(self) -> Self {
+        Self {
+            cache_linked_resources: true,
+            ..self
+        }
+    }
+
     fn apply<'a>(&self, item: &mut Item, attr: &str, target: Selection<'a>) -> Result<()> {
         if let Some(link) = target.attr(attr) {
             let link = link.to_string();

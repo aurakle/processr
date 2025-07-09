@@ -17,7 +17,7 @@ pub struct MarkdownParser {
 }
 
 impl MarkdownParser {
-    pub fn new() -> Self {
+    pub fn default() -> Self {
         Self {
             extensions: Vec::new(),
         }
