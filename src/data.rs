@@ -27,8 +27,10 @@ impl Item {
         for (filename, bytes) in self.cache.iter() {
             let path = cache.join(filename.clone());
 
-            println!("Writing cached file {}", filename);
-            fs::write(path, bytes.as_slice())?;
+            if !path.exists() {
+                println!("Writing cached file {}", filename);
+                fs::write(path, bytes.as_slice())?;
+            }
         }
 
         if let Some(p) = path.parent() {
@@ -92,7 +94,7 @@ impl Item {
         let hasher = Sha256::new();
         let filename_hash = hasher.digest(filename.as_bytes());
         let contents_hash = hasher.digest(bytes.as_slice());
-        let filename = format!("{}-{}", filename_hash, contents_hash);
+        let filename = format!("{}-{}-{}", filename_hash, contents_hash, bytes.len());
         self.cache.insert(filename.clone(), bytes);
 
         format!("/.cache/{}", filename)
