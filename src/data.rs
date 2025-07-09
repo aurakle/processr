@@ -22,12 +22,15 @@ impl Item {
         let cache = root.join(".cache");
         let path = root.join(self.path.clone());
 
-        fs::create_dir_all(path.parent().unwrap_or(&root))?;
-        fs::create_dir_all(cache)?;
+        fs::create_dir_all(cache.clone())?;
 
         for (filename, bytes) in self.cache.iter() {
-            let path = root.join(format!(".cache/{}", filename));
+            let path = cache.join(filename);
             fs::write(path, bytes.as_slice())?
+        }
+
+        if let Some(p) = path.parent() {
+            fs::create_dir_all(p)?;
         }
 
         Ok(fs::write(path, self.bytes.as_slice())?)
