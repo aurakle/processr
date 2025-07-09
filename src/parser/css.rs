@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-use anyhow::{anyhow, Result};
-use chumsky::prelude::*;
+use anyhow::{anyhow, Context, Result};
+use lightningcss::{printer::PrinterOptions, stylesheet::{MinifyOptions, ParserOptions, StyleSheet}, targets::Targets};
 
-use crate::data::Value;
+use crate::data::{Item, Value};
 
 use super::ParserProcedure;
 
@@ -16,65 +16,13 @@ impl CssCompressor {
 }
 
 impl ParserProcedure for CssCompressor {
-    fn process(&self, bytes: &Vec<u8>, properties: &HashMap<String, Value>) -> Result<(Vec<u8>, HashMap<String, Value>)> {
-        let input = String::from_utf8(bytes.clone())?;
-        let output = make_parser().parse(input.as_str()).into_result().map_err(|_e| anyhow!("Failed to parse css"))?;
+    fn process(&self, item: &Item) -> Result<(Vec<u8>, HashMap<String, Value>)> {
+        let input = String::from_utf8(item.bytes.clone())?;
+        let output = StyleSheet::parse(&input, ParserOptions { filename: item.get_filename()?, ..ParserOptions::default() })
+            .map_err(|e| anyhow!("Parsing of css failed at {} due to {}", e.loc.map(|loc| loc.to_string()).unwrap_or("<unknown>".to_owned()), e.kind))?
+            .to_css(PrinterOptions { minify: true, ..PrinterOptions::default() })
+            .map_err(|e| anyhow!("Compression of css failed at {} due to {}", e.loc.map(|loc| loc.to_string()).unwrap_or("<unknown>".to_owned()), e.kind))?;
 
-        Ok((output.as_bytes().to_vec(), properties.clone()))
+        Ok((output.code.as_bytes().to_vec(), item.properties.clone()))
     }
-}
-
-fn make_parser<'src>() -> impl Parser<'src, &'src str, String> {
-    let escaped = choice((
-        any()
-            .and_is(just("*/").not())
-            .repeated()
-            .delimited_by(just("/*"), just("*/"))
-            .to(String::new()),
-        any()
-            .and_is(just('\"').not())
-            .repeated()
-            .padded_by(just('\"'))
-            .to_slice()
-            .map(String::from),
-        any()
-            .and_is(just('\'').not())
-            .repeated()
-            .padded_by(just('\''))
-            .to_slice()
-            .map(String::from),
-    ));
-
-    escaped.clone()
-        .or(any()
-            .and_is(escaped.not())
-            .repeated()
-            .at_least(1)
-            .collect::<String>()
-            .map(|s| {
-                let mut s = s.replace("\n", "");
-                let mut last_len = s.len() * 2;
-
-                while s.len() < last_len {
-                    last_len = s.len();
-                    s = s
-                        .replace("{ ", "{")
-                        .replace(" {", "{")
-                        .replace("} ", "}")
-                        .replace(" }", "}")
-                        .replace(": ", ":")
-                        .replace(" :", ":")
-                        .replace("; ", ";")
-                        .replace(" ;", ";")
-                        .replace(", ", ",")
-                        .replace(" ,", ",")
-                        .replace("	", " ")
-                        .replace("  ", " ");
-                }
-
-                s
-            }))
-        .repeated()
-        .collect::<Vec<String>>()
-        .map(|v| v.concat())
 }

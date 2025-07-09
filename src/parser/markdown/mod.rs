@@ -5,7 +5,7 @@ use chumsky::{prelude::*, text::{ident, newline}};
 use extension::{MarkdownExtension, MarkdownExtensionList};
 use fronma::parser::parse;
 
-use crate::data::Value;
+use crate::data::{Item, Value};
 
 use super::{line_terminator, ParserProcedure};
 
@@ -35,8 +35,8 @@ impl MarkdownParser {
 }
 
 impl ParserProcedure for MarkdownParser {
-    fn process(&self, bytes: &Vec<u8>, properties: &HashMap<String, Value>) -> Result<(Vec<u8>, HashMap<String, Value>)> {
-        let text = String::from_utf8(bytes.clone())?;
+    fn process(&self, item: &Item) -> Result<(Vec<u8>, HashMap<String, Value>)> {
+        let text = String::from_utf8(item.bytes.clone())?;
         let data = parse::<HashMap<String, Value>>(&text).map_err(|e| {
             match e {
                 fronma::error::Error::MissingBeginningLine => anyhow!("Markdown document is missing frontmatter"),
@@ -45,10 +45,10 @@ impl ParserProcedure for MarkdownParser {
             }
         })?;
 
-        let mut body = format!("\n\n\n{}", data.body.to_owned().trim_start());
+        let body = format!("\n\n\n{}", data.body.to_owned().trim_start());
         let res = make_parser(&self.extensions).parse(&body).into_result().map_err(|_e| anyhow!("Failed to parse markdown"))?;
-        let mut properties = properties.clone();
 
+        let mut properties = item.properties.clone();
         properties.extend(data.headers);
 
         Ok((res.as_bytes().to_vec(), properties))

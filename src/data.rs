@@ -1,9 +1,9 @@
-use std::{collections::HashMap, env, fs, path::PathBuf};
+use std::{collections::HashMap, env, fs, path::{Path, PathBuf}};
 
 use anyhow::{anyhow, Result};
 use serde::Deserialize;
 
-use crate::prelude::SingleProcedure;
+use crate::{error::FsError, prelude::SingleProcedure};
 
 #[derive(Debug, Clone)]
 pub struct Item {
@@ -47,6 +47,16 @@ impl Item {
             bytes: self.bytes.clone(),
             properties: self.properties.clone(),
         }
+    }
+
+    pub fn get_filename(&self) -> Result<String> {
+        Ok(self.path
+            .file_name()
+            .map(|os_str| Path::new(os_str))
+            .ok_or(FsError::InvalidFileName)?
+            .to_str()
+            .ok_or(FsError::OsStringNotUtf8)?
+            .to_owned())
     }
 
     pub fn properties_with_url_and_body(&self) -> Result<HashMap<String, Value>> {

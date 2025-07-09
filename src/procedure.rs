@@ -201,7 +201,7 @@ impl<P: SingleProcedure, PARSER: ParserProcedure> SingleProcedure for Parse<P, P
     fn eval(&self) -> Result<Item> {
         let item = self.prior.eval()?;
         let (bytes, properties) = self.parser
-            .process(&item.bytes, &item.properties)
+            .process(&item)
             .context(format!("While parsing {}", item.path.display()))?;
 
         Ok(Item {
@@ -222,12 +222,11 @@ impl<P: SingleProcedure, T: SingleProcedure> SingleProcedure for ApplyTemplate<P
     fn eval(&self) -> Result<Item> {
         let item = self.prior.eval()?;
         let template = self.template.eval()?;
-        let bytes = template.bytes;
         let mut properties = template.properties.clone();
         properties.extend(item.properties_with_url_and_body()?);
 
         let (bytes, properties) = TemplateParser::default()
-            .process(&bytes, &properties)
+            .process(&Item { properties, ..template.clone() })
             .context(format!("While applying template {}", template.path.display()))?;
 
         Ok(Item {
@@ -259,13 +258,7 @@ pub struct LoadDate<P: SingleProcedure> {
 impl<P: SingleProcedure> SingleProcedure for LoadDate<P> {
     fn eval(&self) -> Result<Item> {
         let item = self.prior.eval()?;
-        let file_name = item.path
-            .file_name()
-            .map(|os_str| Path::new(os_str))
-            .ok_or(FsError::InvalidFileName)?
-            .to_str()
-            .ok_or(FsError::OsStringNotUtf8)?
-            .to_owned();
+        let file_name = item.get_filename()?;
 
         let parse_format = format_description!("[year]-[month]-[day]");
         let v = file_name.splitn(4, '-').take(3).collect::<Vec<_>>();
