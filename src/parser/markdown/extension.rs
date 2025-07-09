@@ -1,12 +1,12 @@
 use chumsky::{prelude::*, text::newline};
 use rand::Rng;
 
-use crate::parser::fail;
+use crate::parser::{fail, line_terminator};
 
 #[derive(Clone)]
 pub enum MarkdownExtension {
     Inline(String, String, fn(String) -> String),
-    Block(String, String, fn(String) -> String, fn(Vec<String>) -> String),
+    Block(String, fn(String) -> String, fn(Vec<String>) -> String),
 }
 
 impl MarkdownExtension {
@@ -14,8 +14,8 @@ impl MarkdownExtension {
         MarkdownExtension::Inline(left_delimiter.into(), right_delimiter.into(), wrapper)
     }
 
-    pub fn block<L: Into<String>, R: Into<String>>(left_delimiter: L, right_delimiter: R, line_wrapper: fn(String) -> String, block_wrapper: fn(Vec<String>) -> String) -> MarkdownExtension {
-        MarkdownExtension::Block(left_delimiter.into(), right_delimiter.into(), line_wrapper, block_wrapper)
+    pub fn block<L: Into<String>>(line_start: L, line_wrapper: fn(String) -> String, block_wrapper: fn(Vec<String>) -> String) -> MarkdownExtension {
+        MarkdownExtension::Block(line_start.into(), line_wrapper, block_wrapper)
     }
 }
 
@@ -50,15 +50,15 @@ impl MarkdownExtensionList for Vec<MarkdownExtension> {
         self
             .iter()
             .fold(fail().to(String::new()).boxed(), |previous, current| {
-                if let MarkdownExtension::Block(l, r, line_wrapper, block_wrapper) = current.clone() {
+                if let MarkdownExtension::Block(start, line_wrapper, block_wrapper) = current.clone() {
                     previous.clone()
                         .or(inline_parser.clone()
-                            .nested_in(any()
-                                .and_is(just(r.clone()).not())
-                                .repeated()
-                                .at_least(1)
-                                .to_slice()
-                                .delimited_by(just(l.clone()), just(r.clone())))
+                            .nested_in(just(start.clone())
+                                .ignore_then(any()
+                                    .and_is(line_terminator().not())
+                                    .repeated()
+                                    .at_least(1)
+                                    .to_slice()))
                             .map(line_wrapper)
                             .separated_by(newline())
                             .at_least(1)
@@ -102,7 +102,6 @@ pub fn wobbly() -> MarkdownExtension {
 pub fn small() -> MarkdownExtension {
     MarkdownExtension::block(
         "-# ",
-        "",
         |s| format!("<br/><small>{}</small>", s),
         |lines| lines.concat(),
     )
