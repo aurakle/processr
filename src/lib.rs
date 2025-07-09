@@ -59,16 +59,16 @@ macro_rules! processr {
 
             match $crate::Cli::parse().command {
                 $crate::Command::Serve(args) => {
-                    build(args.clean)?;
+                    build(args.clean).await?;
                     $crate::serve($out, args.port).await
                 },
                 $crate::Command::Build(args) => {
-                    build(args.clean)
+                    build(args.clean).await
                 }
             }
         }
 
-        fn build(clean: bool) -> $crate::anyhow::Result<()> {
+        async fn build(clean: bool) -> $crate::anyhow::Result<()> {
             if clean {
                 $crate::clean($out)?
             }
