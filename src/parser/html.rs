@@ -34,7 +34,7 @@ impl HtmlParser {
             let link = link.to_string();
             let new_link = {
                 if link.starts_with("http://") || link.starts_with("https://") {
-                    if self.cache_linked_resources && target.filter("*:not(a)").exists() {
+                    if self.cache_linked_resources && target.filter("*:not(a):not(link)").exists() {
                         let response = reqwest::blocking::get(link.clone())?;
                         let bytes = response.bytes()?;
                         let file = item.insert_into_cache(link, bytes.to_vec());
