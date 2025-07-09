@@ -75,9 +75,14 @@ impl HtmlParser {
     }
 
     fn relativize(item: &Item, path: PathBuf) -> Result<Option<String>> {
-        println!("Attempting to make {} relative to {}", path.display(), item.path.display());
-
-        if let Some(relative_path) = item.path.parent().map(|p| PathBuf::from("/").join(p)).and_then(|current_dir| diff_paths(path, current_dir)) {
+        if let Some(relative_path) = item.path.parent()
+            .map(|p| PathBuf::from("/")
+                .join(p))
+            .and_then(|current_dir| {
+                println!("Attempting to make {} relative to {}", path.display(), current_dir.display());
+                diff_paths(path, current_dir)
+            })
+        {
             Ok(Some(relative_path
                 .as_os_str()
                 .to_str()
