@@ -90,7 +90,7 @@ impl Item {
 
     pub fn insert_into_cache(&mut self, filename: String, bytes: Vec<u8>) -> String {
         let hasher = Sha512::new();
-        let filename_hash = hasher.digest(filename);
+        let filename_hash = hasher.digest(filename.as_bytes());
         let contents_hash = hasher.digest(bytes.as_slice());
         let filename = format!("{}-{}", filename_hash, contents_hash);
         self.cache.insert(filename.clone(), bytes);
