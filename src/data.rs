@@ -90,11 +90,11 @@ impl Item {
         self.properties_with_url_and_body().map(|props| Value::from(props))
     }
 
-    pub fn insert_into_cache(&mut self, filename: String, bytes: Vec<u8>) -> String {
+    pub fn insert_into_cache(&mut self, filename: String, bytes: Vec<u8>, extension: Option<String>) -> String {
         let hasher = Sha256::new();
         let filename_hash = hasher.digest(filename.as_bytes());
         let contents_hash = hasher.digest(bytes.as_slice());
-        let filename = format!("{}-{}-{}", filename_hash, contents_hash, bytes.len());
+        let filename = format!("{}-{}-{}{}", filename_hash, contents_hash, bytes.len(), extension.map(|ext| format!(".{}", ext)).unwrap_or_else(String::new));
         self.cache.insert(filename.clone(), bytes);
 
         format!("/.cache/{}", filename)

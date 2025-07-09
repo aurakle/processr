@@ -2,6 +2,7 @@ use std::{collections::HashMap, path::{Path, PathBuf}};
 
 use async_trait::async_trait;
 use dom_query::{Document, Selection};
+use mime_guess::get_extensions;
 use pathdiff::diff_paths;
 use anyhow::Result;
 
@@ -46,8 +47,18 @@ impl HtmlParser {
                         println!("Fetching resource at {} for caching", link.clone());
 
                         let response = reqwest::get(link.clone()).await?;
+                        let extension = response
+                            .headers()
+                            .get("Content-Type")
+                            .and_then(|h| h.to_str().ok())
+                            .map(String::from)
+                            .and_then(|m| {
+                                let (left, right) = m.split_once("/")?;
+                                get_extensions(left, right)
+                            })
+                            .and_then(|exts| exts.to_vec().first().map(|ext| ext.to_owned().to_owned()));
                         let bytes = response.bytes().await?;
-                        let file = item.insert_into_cache(link, bytes.to_vec());
+                        let file = item.insert_into_cache(link, bytes.to_vec(), extension);
 
                         if self.relativize_urls {
                             Self::relativize(item, PathBuf::from(file.clone()))?.unwrap_or(file)
