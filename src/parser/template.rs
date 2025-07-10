@@ -11,14 +11,12 @@ use super::ParserProcedure;
 #[derive(Debug, Clone)]
 pub struct TemplateParser();
 
-impl TemplateParser {
-    pub fn default() -> TemplateParser {
-        Self()
-    }
-}
-
 #[async_trait(?Send)]
 impl ParserProcedure for TemplateParser {
+    fn default() -> TemplateParser {
+        Self()
+    }
+
     async fn process(&self, state: &mut State, item: &Item) -> Result<Item> {
         let text = String::from_utf8(item.bytes.clone())?;
         let parser = make_parser(item.properties.clone());

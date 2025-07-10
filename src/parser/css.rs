@@ -13,12 +13,6 @@ pub struct CssParser {
 }
 
 impl CssParser {
-    pub fn default() -> Self {
-        Self {
-            minify: false,
-        }
-    }
-
     pub fn minify(self) -> Self {
         Self {
             minify: true,
@@ -29,6 +23,12 @@ impl CssParser {
 
 #[async_trait(?Send)]
 impl ParserProcedure for CssParser {
+    fn default() -> Self {
+        Self {
+            minify: false,
+        }
+    }
+
     async fn process(&self, state: &mut State, item: &Item) -> Result<Item> {
         let input = String::from_utf8(item.bytes.clone())?;
         let output = StyleSheet::parse(&input, ParserOptions { filename: item.get_filename()?, ..ParserOptions::default() })

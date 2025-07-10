@@ -8,11 +8,13 @@ use crate::data::{Item, State, Value};
 
 pub mod markdown;
 pub mod template;
+pub mod image;
 pub mod html;
 pub mod css;
 
 #[async_trait(?Send)]
 pub trait ParserProcedure: Clone {
+    fn default() -> Self;
     async fn process(&self, state: &mut State, item: &Item) -> Result<Item>;
 }
 

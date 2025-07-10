@@ -17,13 +17,6 @@ pub struct HtmlParser {
 }
 
 impl HtmlParser {
-    pub fn default() -> Self {
-        Self {
-            relativize_urls: false,
-            cache_linked_resources: false,
-        }
-    }
-
     pub fn relativize_urls(self) -> Self {
         Self {
             relativize_urls: true,
@@ -115,6 +108,13 @@ impl HtmlParser {
 
 #[async_trait(?Send)]
 impl ParserProcedure for HtmlParser {
+    fn default() -> Self {
+        Self {
+            relativize_urls: false,
+            cache_linked_resources: false,
+        }
+    }
+
     async fn process(&self, state: &mut State, item: &Item) -> Result<Item> {
         let mut item = item.clone();
         let mut document = Document::from(String::from_utf8(item.bytes.clone())?);

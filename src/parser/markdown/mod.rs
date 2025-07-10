@@ -18,12 +18,6 @@ pub struct MarkdownParser {
 }
 
 impl MarkdownParser {
-    pub fn default() -> Self {
-        Self {
-            extensions: Vec::new(),
-        }
-    }
-
     pub fn extend(&self, extension: MarkdownExtension) -> Self {
         let mut extensions = self.extensions.clone();
 
@@ -37,6 +31,12 @@ impl MarkdownParser {
 
 #[async_trait(?Send)]
 impl ParserProcedure for MarkdownParser {
+    fn default() -> Self {
+        Self {
+            extensions: Vec::new(),
+        }
+    }
+
     async fn process(&self, state: &mut State, item: &Item) -> Result<Item> {
         let text = String::from_utf8(item.bytes.clone())?;
         let data = parse::<HashMap<String, Value>>(&text).map_err(|e| {
