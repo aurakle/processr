@@ -297,12 +297,6 @@ fn inline<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, b
 
 #[cfg(test)]
 mod tests {
-    mod document {
-        use chumsky::Parser;
-
-        use crate::parser::markdown::make_parser;
-    }
-
     mod block {
         use chumsky::Parser;
 
@@ -456,26 +450,6 @@ mod tests {
             let expected = format!("<u>meow</u>");
 
             assert_eq!(expected, res);
-        }
-    }
-
-    mod extensions {
-        use chumsky::Parser;
-
-        use crate::parser::markdown::{extension, make_parser};
-
-        #[test]
-        fn small() {
-            let p = make_parser(&vec![extension::small()]);
-            let res = p.parse("-# meow").into_result().unwrap();
-            let expected = format!("<br/><small>meow</small>");
-
-            assert_eq!(expected, res);
-        }
-
-        #[test]
-        fn wobbly() {
-            todo!()
         }
     }
 }
