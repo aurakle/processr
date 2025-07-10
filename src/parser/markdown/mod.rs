@@ -187,7 +187,14 @@ fn inline<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, b
                 }),
             // code block
             just("```")
-                .ignore_then(ident().then_ignore(newline()).or_not())
+                .ignore_then(any()
+                    .and_is(newline().not())
+                    .and_is(just("```").not())
+                    .repeated()
+                    .at_least(1)
+                    .to_slice()
+                    .then_ignore(newline())
+                    .or_not())
                 .then(any()
                     .and_is(just("```").not())
                     .repeated()
@@ -197,7 +204,7 @@ fn inline<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, b
                 .map(|(lang, inner)| {
                     let inner = html_escape::encode_safe(inner);
                     match lang {
-                        Some(lang) => format!("<pre><code class=\"language-{}\">{}</code></pre>", lang, inner),
+                        Some(filename) => format!("<pre><small>{}</small><code>{}</code></pre>", filename, inner),
                         None => format!("<pre><code>{}</code></pre>", inner),
                     }
                 }),
