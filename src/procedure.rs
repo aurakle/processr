@@ -272,9 +272,20 @@ impl<P: SingleProcedure> SingleProcedure for LoadDate<P> {
 
         let parse_format = format_description!("[year]-[month]-[day]");
         let v = file_name.splitn(4, '-').take(3).collect::<Vec<_>>();
-        let date = Date::parse(v.join("-").as_str(), parse_format)?;
+        let date_raw = v.join("-");
+        let date = Date::parse(date_raw.as_str(), parse_format)?;
 
-        Ok(item.set_property("date", date.format(self.format)?))
+        let mut properties = item.properties.clone();
+        properties.insert("dateRaw".to_owned(), Value::from(date_raw));
+        properties.insert("date".to_owned(), Value::from(date.format(self.format)?));
+        properties.insert("dateYear".to_owned(), Value::from(format!("{}", v[0])));
+        properties.insert("dateMonth".to_owned(), Value::from(format!("{}", v[1])));
+        properties.insert("dateDay".to_owned(), Value::from(format!("{}", v[2])));
+
+        Ok(Item {
+            properties,
+            ..item.clone()
+        })
     }
 }
 
