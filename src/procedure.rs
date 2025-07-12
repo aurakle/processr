@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use std::path::Path;
 use std::{env, path::PathBuf};
 
@@ -13,13 +14,12 @@ use crate::selector;
 use crate::Item;
 
 #[async_trait(?Send)]
-pub trait Procedure: Sized + Clone {
-    async fn write(&self, state: &mut State) -> Result<()>;
-}
-
-#[async_trait(?Send)]
-pub trait SingleProcedure: Procedure + Sized + Clone {
+pub trait SingleProcedure: Sized + Clone {
     async fn eval(&self, state: &mut State) -> Result<Item>;
+
+    async fn write(&self, state: &mut State) -> Result<()> {
+        self.eval(state).await?.write(&state.root)
+    }
 
     fn property<S: Into<String>>(self, key: S, value: Value) -> SetProperty<Self> {
         SetProperty {
@@ -84,58 +84,65 @@ pub trait SingleProcedure: Procedure + Sized + Clone {
 }
 
 #[async_trait(?Send)]
-pub trait MultiProcedure<P: SingleProcedure>: Procedure + Sized + Clone {
-    fn chain<O, F>(self, func: F) -> impl MultiProcedure<O>
-    where
-        O: SingleProcedure,
-        F: Fn(P) -> O,
-    ;
+pub trait MultiProcedure<P: SingleProcedure>: Sized + Clone {
+    async fn eval(&self, state: &mut State) -> Result<Vec<Item>>;
 
-    async fn into_meta(&self, state: &mut State) -> Result<Value>;
-}
-
-#[async_trait(?Send)]
-impl<P: SingleProcedure> Procedure for P {
     async fn write(&self, state: &mut State) -> Result<()> {
-        self.eval(state).await?.write(&state.root)
-    }
-}
-
-#[async_trait(?Send)]
-impl<P: SingleProcedure> Procedure for Vec<P> {
-    async fn write(&self, state: &mut State) -> Result<()> {
-        for p in self {
-            p.write(state).await?;
+        for item in self.eval(state).await? {
+            item.write(&state.root)?;
         }
 
         Ok(())
-    }
-}
-
-#[async_trait(?Send)]
-impl<P: SingleProcedure> MultiProcedure<P> for Vec<P> {
-    fn chain<O, F>(self, func: F) -> impl MultiProcedure<O>
-    where
-        O: SingleProcedure,
-        F: Fn(P) -> O,
-    {
-        let mut result = Vec::new();
-
-        for p in self {
-            result.push(func(p.clone()));
-        }
-
-        result
     }
 
     async fn into_meta(&self, state: &mut State) -> Result<Value> {
         let mut result = Vec::new();
 
-        for p in self {
-           result.push(p.eval(state).await?.into_meta()?);
+        for item in self.eval(state).await? {
+           result.push(item.into_meta()?);
         }
 
         Ok(Value::from(result))
+    }
+
+    fn chained<O, F>(self, func: F) -> Chain<P, Self, O, F>
+    where
+        O: SingleProcedure,
+        F: Fn(Item) -> O + Clone,
+    {
+        Chain {
+            p1: PhantomData::default(),
+            p2: PhantomData::default(),
+            prior: self,
+            func,
+        }
+    }
+
+    fn sorted(self) -> SortByFilename<P, Self> {
+        SortByFilename {
+            p1: PhantomData::default(),
+            prior: self,
+        }
+    }
+
+    fn reversed(self) -> Reverse<P, Self> {
+        Reverse {
+            p1: PhantomData::default(),
+            prior: self,
+        }
+    }
+}
+
+#[async_trait(?Send)]
+impl<P: SingleProcedure> MultiProcedure<P> for Vec<P> {
+    async fn eval(&self, state: &mut State) -> Result<Vec<Item>> {
+        let mut res = Vec::new();
+
+        for p in self {
+            res.push(p.eval(state).await?);
+        }
+
+        Ok(res)
     }
 }
 
@@ -307,5 +314,70 @@ where
 {
     async fn eval(&self, state: &mut State) -> Result<Item> {
         (self.func)(self.prior.eval(state).await?)
+    }
+}
+#[derive(Clone)]
+pub struct Chain<P, M, O, F>
+where
+    P: SingleProcedure,
+    M: MultiProcedure<P>,
+    O: SingleProcedure,
+    F: Fn(Item) -> O + Clone,
+{
+    p1: PhantomData<P>,
+    p2: PhantomData<O>,
+    prior: M,
+    func: F,
+}
+
+#[async_trait(?Send)]
+impl<P, M, O, F> MultiProcedure<O> for Chain<P, M, O, F>
+where
+    P: SingleProcedure,
+    M: MultiProcedure<P>,
+    O: SingleProcedure,
+    F: Fn(Item) -> O + Clone,
+{
+    async fn eval(&self, state: &mut State) -> Result<Vec<Item>> {
+        let items = self.prior.eval(state).await?;
+        let mut res = Vec::new();
+
+        for item in items {
+            res.push((self.func)(item).eval(state).await?);
+        }
+
+        Ok(res)
+    }
+}
+
+#[derive(Clone)]
+pub struct SortByFilename<P: SingleProcedure, M: MultiProcedure<P>> {
+    p1: PhantomData<P>,
+    prior: M,
+}
+
+#[async_trait(?Send)]
+impl<P: SingleProcedure, M: MultiProcedure<P>> MultiProcedure<P> for SortByFilename<P, M> {
+    async fn eval(&self, state: &mut State) -> Result<Vec<Item>> {
+        let mut items = self.prior.eval(state).await?;
+        items.sort_by(|a, b| a.get_filename().unwrap_or(String::new()).cmp(&b.get_filename().unwrap_or(String::new())));
+
+        Ok(items)
+    }
+}
+
+#[derive(Clone)]
+pub struct Reverse<P: SingleProcedure, M: MultiProcedure<P>> {
+    p1: PhantomData<P>,
+    prior: M,
+}
+
+#[async_trait(?Send)]
+impl<P: SingleProcedure, M: MultiProcedure<P>> MultiProcedure<P> for Reverse<P, M> {
+    async fn eval(&self, state: &mut State) -> Result<Vec<Item>> {
+        let mut items = self.prior.eval(state).await?;
+        items.reverse();
+
+        Ok(items)
     }
 }
