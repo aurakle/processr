@@ -72,7 +72,7 @@ macro_rules! processr {
             }
 
             let mut $state = $crate::data::State::new($out);
-            $(let $names = $rules; $crate::procedure::Procedure::write(&$names, &mut $state).await?;)+
+            $(let $names = $rules; $names.write(&mut $state).await?;)+
 
             Ok(())
         }
