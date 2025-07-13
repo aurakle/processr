@@ -52,7 +52,8 @@ impl HtmlParser {
                                         let (left, right) = m.split_once("/")?;
                                         get_extensions(left, right)
                                     })
-                                    .and_then(|exts| exts.to_vec().first().map(|ext| ext.to_owned().to_owned()));
+                                    .and_then(|exts| exts.to_vec().first().map(|ext| ext.to_owned().to_owned()))
+                                    .or_else(|| link.rsplit_once(".").map(|(left, right)| right.to_owned()));
                                 let bytes = response.bytes().await?;
 
                                 item.insert_into_cache(state, link, bytes.to_vec(), extension)
