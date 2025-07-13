@@ -108,7 +108,7 @@ fn block<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, ex
                                 .to_slice()))
                         .map(|s| format!("<h1>{}</h1>", s)),
                     // thematic break
-                    just("---")
+                    just("---\n")
                         .to(format!("<hr/>")),
                     extensions.build_block_parser(inline.clone().boxed()),
                 )))
