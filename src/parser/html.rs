@@ -5,6 +5,7 @@ use dom_query::{Document, Selection};
 use mime_guess::get_extensions;
 use pathdiff::diff_paths;
 use anyhow::Result;
+use reqwest::Client;
 
 use crate::{data::{Item, State, Value}, error::FsError};
 
@@ -31,7 +32,7 @@ impl HtmlParser {
         }
     }
 
-    async fn apply<'a>(&self, state: &mut State, item: &mut Item, attr: &str, target: Selection<'a>) -> Result<()> {
+    async fn apply<'a>(&self, state: &mut State, http_client: &Client, item: &mut Item, attr: &str, target: Selection<'a>) -> Result<()> {
         if let Some(link) = target.attr(attr) {
             let link = link.to_string();
             let new_link = {
@@ -42,7 +43,7 @@ impl HtmlParser {
                             None => {
                                 println!("Caching resource at {}", link.clone());
 
-                                let response = reqwest::get(link.clone()).await?;
+                                let response = http_client.get(link.clone()).send().await?;
                                 let extension = response
                                     .headers()
                                     .get("Content-Type")
@@ -122,19 +123,22 @@ impl ParserProcedure for HtmlParser {
 
     async fn process(&self, state: &mut State, item: &Item) -> Result<Item> {
         let mut item = item.clone();
+        let client = reqwest::Client::builder()
+            .user_agent(concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")))
+            .build()?;
         let mut document = Document::from(String::from_utf8(item.bytes.clone())?);
         document.normalize();
 
         let href_targets = document.select("*[href]:not([href=\"\"])").iter();
 
         for target in href_targets {
-            self.apply(state, &mut item, "href", target).await?;
+            self.apply(state, &client, &mut item, "href", target).await?;
         }
 
         let src_targets = document.select("*[src]:not([src=\"\"])").iter();
 
         for target in src_targets {
-            self.apply(state, &mut item, "src", target).await?;
+            self.apply(state, &client, &mut item, "src", target).await?;
         }
 
         document.normalize();
