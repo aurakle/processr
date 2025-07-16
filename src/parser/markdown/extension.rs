@@ -86,7 +86,7 @@ pub fn quote() -> MarkdownExtension {
     MarkdownExtension::block(
         "> ",
         |s| s,
-        |lines| format!("<blockquote>{}</blockquote>", lines.join("<br/>"))
+        |lines| format!("</p><blockquote>{}</blockquote><p>", lines.join("<br/>"))
     )
 }
 

@@ -91,7 +91,7 @@ fn block<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, ex
                                 .repeated()
                                 .at_least(1)
                                 .to_slice()))
-                        .map(|s| format!("<h3>{}</h3>", s)),
+                        .map(|s| format!("</p><h3>{}</h3><p>", s)),
                     inline.clone()
                         .nested_in(just("## ")
                             .ignore_then(any()
@@ -99,7 +99,7 @@ fn block<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, ex
                                 .repeated()
                                 .at_least(1)
                                 .to_slice()))
-                        .map(|s| format!("<h2>{}</h2>", s)),
+                        .map(|s| format!("</p><h2>{}</h2><p>", s)),
                     inline.clone()
                         .nested_in(just("# ")
                             .ignore_then(any()
@@ -107,7 +107,7 @@ fn block<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, ex
                                 .repeated()
                                 .at_least(1)
                                 .to_slice()))
-                        .map(|s| format!("<h1>{}</h1>", s)),
+                        .map(|s| format!("</p><h1>{}</h1><p>", s)),
                     // thematic break
                     just("---\n")
                         .to(format!("<hr/>")),
@@ -190,12 +190,13 @@ fn inline<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, b
                     let inner = html_escape::encode_safe(inner);
                     match special {
                         Some(special) => match special.rsplit_once(".") {
-                            Some((_, language)) => format!("<pre><small>{}</small><code class=\"language-{}\">{}</code></pre>", special, language, inner),
-                            None => format!("<pre><code class=\"language-{}\">{}</code></pre>", special, inner),
+                            Some((_, language)) => format!("<small>{}</small><code class=\"language-{}\">{}</code>", special, language, inner),
+                            None => format!("<code class=\"language-{}\">{}</code>", special, inner),
                         },
-                        None => format!("<pre><code>{}</code></pre>", inner),
+                        None => format!("<code>{}</code>", inner),
                     }
-                }),
+                })
+                .map(|s| format!("</p><pre>{}</pre><p>", s)),
             // code line
             any()
                 .and_is(just('`').not())
