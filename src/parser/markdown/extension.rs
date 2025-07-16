@@ -74,6 +74,22 @@ impl MarkdownExtensionList for Vec<MarkdownExtension> {
     }
 }
 
+pub fn small() -> MarkdownExtension {
+    MarkdownExtension::block(
+        "-# ",
+        |s| format!("<br/><small>{}</small>", s),
+        |lines| lines.concat(),
+    )
+}
+
+pub fn quote() -> MarkdownExtension {
+    MarkdownExtension::block(
+        "> ",
+        |s| s,
+        |lines| format!("<blockquote>{}</blockquote>", lines.join("<br/>"))
+    )
+}
+
 pub fn wobbly() -> MarkdownExtension {
     MarkdownExtension::inline("~{", "}~", |s| {
         let mut hasher = DefaultHasher::new();
@@ -103,14 +119,6 @@ pub fn wobbly() -> MarkdownExtension {
     })
 }
 
-pub fn small() -> MarkdownExtension {
-    MarkdownExtension::block(
-        "-# ",
-        |s| format!("<br/><small>{}</small>", s),
-        |lines| lines.concat(),
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use chumsky::Parser;
@@ -124,6 +132,15 @@ mod tests {
         let expected = format!("<br/><small>meow</small>");
 
         assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn quote() {
+        let p = make_parser(&vec![extension::quote()]);
+        let res = p.parse("> a quote\n> with two lines, wow!").into_result().unwrap();
+        let expected = format!("<blockquote>a quote<br/>with two lines, wow!</blockquote>");
+
+        assert_eq!(expected, res)
     }
 
     #[test]
