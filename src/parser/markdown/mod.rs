@@ -47,8 +47,8 @@ impl ParserProcedure for MarkdownParser {
             }
         })?;
 
-        let body = format!("\n\n\n{}", data.body.to_owned().trim());
-        let res = make_parser(&self.extensions).parse(&body).into_result().map_err(|_e| anyhow!("Failed to parse markdown"))?;
+        let body = data.body.to_owned().trim().to_owned();
+        let res = format!("<p>{}</p>", make_parser(&self.extensions).parse(&body).into_result().map_err(|_e| anyhow!("Failed to parse markdown"))?);
 
         let mut properties = item.properties.clone();
         properties.extend(data.headers);
@@ -66,7 +66,7 @@ fn make_parser<'src>(extensions: &Vec<MarkdownExtension>) -> impl Parser<'src, &
         let block = block(this.clone(), extensions.clone()).boxed();
         choice((
             block.clone(),
-            inline(this.clone(), block, extensions.clone()),
+            inline(this, block, extensions.clone()),
         ))
             .repeated()
             .at_least(1)
@@ -113,30 +113,11 @@ fn block<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, ex
                     extensions.build_block_parser(inline.clone().boxed()),
                 )))
             .boxed();
-        let paragraph = recursive(|paragraph| {
-            this.clone()
-                .and_is(paragraph.not())
-                .or(inline)
-                .repeated()
-                .collect::<Vec<String>>()
-                .map(|elements| elements.concat())
-                .nested_in(newline()
-                    .repeated()
-                    .at_least(3)
-                    .ignore_then(any()
-                        .and_is(newline()
-                            .repeated()
-                            .at_least(3)
-                            .not())
-                        .repeated()
-                        .at_least(1)
-                        .to_slice()))
-                .map(|s| format!("<p>{}</p>", s))
-        });
 
         choice((
             block,
-            paragraph,
+            // paragraph
+            newline().repeated().exactly(3).to(format!("</p><p>")),
             // line break
             newline().repeated().exactly(2).to(format!("<br/>")),
         ))
@@ -335,35 +316,8 @@ mod tests {
         #[test]
         fn paragraph() {
             let p = make_parser(&vec![]);
-            let res = p.parse("\n\n\nmeow").into_result().unwrap();
-            let expected = format!("<p>meow</p>");
-
-            assert_eq!(expected, res);
-        }
-
-        #[test]
-        fn paragraph_with_bold_and_italics() {
-            let p = make_parser(&vec![]);
-            let res = p.parse("\n\n\n***meow***").into_result().unwrap();
-            let expected = format!("<p><b><i>meow</i></b></p>");
-
-            assert_eq!(expected, res);
-        }
-
-        #[test]
-        fn paragraph_followed_by_header() {
-            let p = make_parser(&vec![]);
-            let res = p.parse("\n\n\nmeow\n# Some header").into_result().unwrap();
-            let expected = format!("<p>meow<h1>Some header</h1></p>");
-
-            assert_eq!(expected, res);
-        }
-
-        #[test]
-        fn paragraph_followed_by_fake_header() {
-            let p = make_parser(&vec![]);
-            let res = p.parse("\n\n\nmeow# Some header").into_result().unwrap();
-            let expected = format!("<p>meow# Some header</p>");
+            let res = p.parse("meow\n\n\nmeow").into_result().unwrap();
+            let expected = format!("meow</p><p>meow");
 
             assert_eq!(expected, res);
         }
