@@ -47,7 +47,7 @@ impl ParserProcedure for MarkdownParser {
             }
         })?;
 
-        let body = format!("\n\n\n{}", data.body.to_owned().trim_start());
+        let body = format!("\n\n\n{}", data.body.to_owned().trim());
         let res = make_parser(&self.extensions).parse(&body).into_result().map_err(|_e| anyhow!("Failed to parse markdown"))?;
 
         let mut properties = item.properties.clone();
