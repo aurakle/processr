@@ -48,7 +48,8 @@ impl ParserProcedure for MarkdownParser {
         })?;
 
         let body = data.body.to_owned().trim().to_owned();
-        let res = format!("<p>{}</p>", make_parser(&self.extensions).parse(&body).into_result().map_err(|_e| anyhow!("Failed to parse markdown"))?);
+        let res = make_parser(&self.extensions).parse(&body).into_result().map_err(|_e| anyhow!("Failed to parse markdown"))?;
+        let res = format!("<p>{}</p>", res);
 
         let mut properties = item.properties.clone();
         properties.extend(data.headers);
@@ -116,7 +117,7 @@ fn block<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, ex
 
         choice((
             block,
-            // paragraph
+            // paragraph break
             newline().repeated().exactly(3).to(format!("</p><p>")),
             // line break
             newline().repeated().exactly(2).to(format!("<br/>")),
@@ -270,8 +271,8 @@ fn inline<'src>(parser: Recursive<dyn Parser<'src, &'src str, String> + 'src>, b
                 .to(format!("")),
             inline.clone(),
             any()
-                .and_is(newline().not())
                 .and_is(inline.not())
+                .and_is(newline().not())
                 .repeated()
                 .at_least(1)
                 .collect::<String>(),
