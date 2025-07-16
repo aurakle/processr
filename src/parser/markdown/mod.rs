@@ -49,7 +49,8 @@ impl ParserProcedure for MarkdownParser {
 
         let body = data.body.to_owned().trim().to_owned();
         let res = make_parser(&self.extensions).parse(&body).into_result().map_err(|_e| anyhow!("Failed to parse markdown"))?;
-        let res = format!("<p>{}</p>", res);
+        // markdown is stupid and I'm lazy, so have a band-aid fix
+        let res = format!("<p>{}</p>", res).replace("<p></p>", "");
 
         let mut properties = item.properties.clone();
         properties.extend(data.headers);
