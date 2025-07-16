@@ -18,7 +18,7 @@ pub trait SingleProcedure: Sized + Clone {
     async fn eval(&self, state: &mut State) -> Result<Item>;
 
     async fn write(&self, state: &mut State) -> Result<()> {
-        self.eval(state).await?.write(&state.root)
+        self.eval(state).await?.write(state)
     }
 
     fn property<S: Into<String>>(self, key: S, value: Value) -> SetProperty<Self> {
@@ -89,7 +89,7 @@ pub trait MultiProcedure<P: SingleProcedure>: Sized + Clone {
 
     async fn write(&self, state: &mut State) -> Result<()> {
         for item in self.eval(state).await? {
-            item.write(&state.root)?;
+            item.write(state)?;
         }
 
         Ok(())

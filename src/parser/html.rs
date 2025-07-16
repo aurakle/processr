@@ -158,7 +158,7 @@ mod tests {
     #[actix_web::test]
     async fn relativize() {
         let p = HtmlParser::default().relativize_urls();
-        let res = p.process(&mut State::new("dist"), &Item {
+        let res = p.process(&mut State::new("dist").unwrap(), &Item {
             path: PathBuf::from("/posts/thing1.html"),
             bytes: b"<html lang=\"en\"><head><link rel=\"stylesheet\" href=\"/css/default.css\"></head><body><a href=\"/another/file.html\">Some link</a><img src=\"/images/profile.png\"></body></html>".to_vec(),
             properties: HashMap::new(),
@@ -173,7 +173,7 @@ mod tests {
     #[actix_web::test]
     async fn relativize_with_unapplied_caching() {
         let p = HtmlParser::default().relativize_urls().cache_linked_resources();
-        let res = p.process(&mut State::new("dist"), &Item {
+        let res = p.process(&mut State::new("dist").unwrap(), &Item {
             path: PathBuf::from("/posts/thing1.html"),
             bytes: b"<html lang=\"en\"><head><link rel=\"stylesheet\" href=\"/css/default.css\"></head><body><a href=\"/another/file.html\">Some link</a><img src=\"/images/profile.png\"></body></html>".to_vec(),
             properties: HashMap::new(),

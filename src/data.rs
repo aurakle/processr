@@ -7,18 +7,40 @@ use sha_rs::{Sha, Sha256, Sha512};
 
 use crate::{error::FsError, prelude::SingleProcedure};
 
+static SOURCES: &str = "sources.json";
+
 #[derive(Debug)]
 pub struct State {
     pub root: PathBuf,
+    pub cache: PathBuf,
     pub cached_resources: HashMap<String, String>,
 }
 
 impl State {
-    pub fn new(root: &str) -> Self {
-        Self {
-            root: PathBuf::from(root),
-            cached_resources: HashMap::new(),
-        }
+    pub fn new(root: &str) -> Result<Self> {
+        let pwd = env::current_dir()?;
+        let root = pwd.join(root);
+        let cache = root.join(".cache");
+        let cached_resources = Self::load_cc(&cache).unwrap_or(HashMap::new());
+
+        Ok(Self {
+            root,
+            cache,
+            cached_resources,
+        })
+    }
+
+    pub fn save(&mut self) -> Result<()> {
+        fs::write(self.cache.join(SOURCES), serde_json::to_string(&self.cached_resources)?.as_bytes())?;
+
+        Ok(())
+    }
+
+    fn load_cc(cache: &Path) -> Result<HashMap<String, String>> {
+        let sources = fs::read_to_string(cache.join(SOURCES))?;
+        let res = serde_json::from_str(&sources)?;
+
+        Ok(res)
     }
 }
 
@@ -31,16 +53,13 @@ pub struct Item {
 }
 
 impl Item {
-    pub fn write(&self, root: &Path) -> Result<()> {
-        let pwd = env::current_dir()?;
-        let root = pwd.join(root);
-        let cache = root.join(".cache");
-        let path = root.join(self.path.clone());
+    pub fn write(&self, state: &State) -> Result<()> {
+        let path = state.root.join(self.path.clone());
 
-        fs::create_dir_all(cache.clone())?;
+        fs::create_dir_all(state.cache.clone())?;
 
         for (filename, bytes) in self.cache.iter() {
-            let path = cache.join(filename.clone());
+            let path = state.cache.join(filename.clone());
 
             if !path.exists() {
                 println!("Writing cached resource {}", filename);
