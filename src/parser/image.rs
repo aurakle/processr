@@ -14,7 +14,7 @@ pub struct ImageConverter {
 }
 
 impl ImageConverter {
-    fn new(format: ImageFormat) -> Self {
+    pub fn new(format: ImageFormat) -> Self {
         Self { format }
     }
 }
