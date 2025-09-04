@@ -66,7 +66,7 @@ impl HtmlParser {
                                                 .map(|(left, right)| right.to_owned())));
                                     let bytes = response.bytes().await?;
 
-                                    item.insert_into_cache(state, link, bytes.to_vec(), extension)
+                                    item.insert_into_cache(state, link, bytes.to_vec(), extension)?
                                 } else {
                                     println!("Caching failed");
                                     println!("Falling back to external link");

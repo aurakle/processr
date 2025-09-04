@@ -237,15 +237,12 @@ impl<P: SingleProcedure, T: SingleProcedure> SingleProcedure for ApplyTemplate<P
         let template = self.template.eval(state).await?;
         let mut properties = template.properties.clone();
         properties.extend(item.properties_with_url_and_body()?);
-        let mut cache = template.cache.clone();
-        cache.extend(item.cache.clone());
 
         TemplateParser::default()
             .process(state, &Item {
                 path: item.path.clone(),
                 bytes: template.bytes.clone(),
                 properties,
-                cache
             })
             .await
             .context(format!("While applying template {}", template.path.display()))

@@ -23,6 +23,8 @@ impl State {
         let cache = root.join(".cache");
         let cached_resources = Self::load_cc(&cache).unwrap_or(HashMap::new());
 
+        fs::create_dir_all(&cache)?;
+
         Ok(Self {
             root,
             cache,
@@ -49,23 +51,11 @@ pub struct Item {
     pub path: PathBuf,
     pub bytes: Vec<u8>,
     pub properties: HashMap<String, Value>,
-    pub cache: HashMap<String, Vec<u8>>,
 }
 
 impl Item {
     pub fn write(&self, state: &State) -> Result<()> {
         let path = state.root.join(self.path.clone());
-
-        fs::create_dir_all(state.cache.clone())?;
-
-        for (filename, bytes) in self.cache.iter() {
-            let path = state.cache.join(filename.clone());
-
-            if !path.exists() {
-                println!("Writing cached resource {}", filename);
-                fs::write(path, bytes.as_slice())?;
-            }
-        }
 
         if let Some(p) = path.parent() {
             fs::create_dir_all(p)?;
@@ -79,7 +69,6 @@ impl Item {
             path: PathBuf::from(path.strip_prefix(env::current_dir()?).unwrap_or(&path)),
             bytes: fs::read(path)?,
             properties: HashMap::new(),
-            cache: HashMap::new(),
         })
     }
 
@@ -124,16 +113,22 @@ impl Item {
         self.properties_with_url_and_body().map(|props| Value::from(props))
     }
 
-    pub fn insert_into_cache(&mut self, state: &mut State, link: String, bytes: Vec<u8>, extension: Option<String>) -> String {
+    pub fn insert_into_cache(&mut self, state: &mut State, link: String, bytes: Vec<u8>, extension: Option<String>) -> Result<String> {
         let hasher = Sha256::new();
         let contents_hash = hasher.digest(bytes.as_slice());
         let filename = format!("{}-{}{}", contents_hash, bytes.len(), extension.map(|ext| format!(".{}", ext)).unwrap_or_else(String::new));
-        self.cache.insert(filename.clone(), bytes);
+
+        let path = state.cache.join(filename.clone());
+
+        if !path.exists() {
+            println!("Writing cached resource {}", filename);
+            fs::write(path, bytes.as_slice())?;
+        }
 
         let cache_link = format!("/.cache/{}", filename);
         state.cached_resources.insert(link, cache_link.clone());
 
-        cache_link
+        Ok(cache_link)
     }
 }
 
