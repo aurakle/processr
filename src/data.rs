@@ -130,10 +130,10 @@ impl Item {
         let filename = format!("{}-{}{}", contents_hash, bytes.len(), extension.map(|ext| format!(".{}", ext)).unwrap_or_else(String::new));
         self.cache.insert(filename.clone(), bytes);
 
-        let filename = format!("/.cache/{}", filename);
-        state.cached_resources.insert(link, filename.clone());
+        let cache_link = format!("/.cache/{}", filename);
+        state.cached_resources.insert(link, cache_link.clone());
 
-        filename
+        cache_link
     }
 }
 
