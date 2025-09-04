@@ -44,24 +44,33 @@ impl HtmlParser {
                                 println!("Caching resource at {}", link.clone());
 
                                 let response = http_client.get(link.clone()).send().await?;
-                                let extension = response
-                                    .headers()
-                                    .get("Content-Type")
-                                    .and_then(|h| h.to_str().ok())
-                                    .map(String::from)
-                                    .and_then(|m| {
-                                        let (left, right) = m.split_once("/")?;
-                                        get_extensions(left, right)
-                                    })
-                                    .and_then(|exts| exts.to_vec().first().map(|ext| ext.to_owned().to_owned()))
-                                    .or_else(|| link
-                                        .rsplit_once("/")
-                                        .and_then(|(left, right)| right.to_owned()
-                                            .rsplit_once(".")
-                                            .map(|(left, right)| right.to_owned())));
-                                let bytes = response.bytes().await?;
+                                let status = response.status();
 
-                                item.insert_into_cache(state, link, bytes.to_vec(), extension)
+                                if status.is_success() {
+                                    let extension = response
+                                        .headers()
+                                        .get("Content-Type")
+                                        .and_then(|h| h.to_str().ok())
+                                        .map(String::from)
+                                        .and_then(|m| {
+                                            let (left, right) = m.split_once("/")?;
+                                            get_extensions(left, right)
+                                        })
+                                        .and_then(|exts| exts.to_vec().first().map(|ext| ext.to_owned().to_owned()))
+                                        .or_else(|| link
+                                            .rsplit_once("/")
+                                            .and_then(|(left, right)| right.to_owned()
+                                                .rsplit_once(".")
+                                                .map(|(left, right)| right.to_owned())));
+                                    let bytes = response.bytes().await?;
+
+                                    item.insert_into_cache(state, link, bytes.to_vec(), extension)
+                                } else {
+                                    println!("Caching failed with status {}{}", status.as_u16(), status.canonical_reason().map(|s| format!(": \"{}\"", s)).unwrap_or(String::new()));
+                                    println!("Falling back to external link {}", link);
+
+                                    link
+                                }
                             },
                         };
 
