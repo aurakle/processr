@@ -46,6 +46,8 @@ impl HtmlParser {
                                 let response = http_client.get(link.clone()).send().await?;
                                 let status = response.status();
 
+                                println!("Received HTTP status {}{}", status.as_u16(), status.canonical_reason().map(|s| format!(": \"{}\"", s)).unwrap_or(String::new()));
+
                                 if status.is_success() {
                                     let extension = response
                                         .headers()
@@ -66,8 +68,7 @@ impl HtmlParser {
 
                                     item.insert_into_cache(state, link, bytes.to_vec(), extension)
                                 } else {
-                                    println!("Caching failed with status {}{}", status.as_u16(), status.canonical_reason().map(|s| format!(": \"{}\"", s)).unwrap_or(String::new()));
-                                    println!("Falling back to external link {}", link);
+                                    println!("Caching failed. Falling back to external link: {}", link);
 
                                     link
                                 }
