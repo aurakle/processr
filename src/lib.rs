@@ -5,6 +5,7 @@ use anyhow::{Context, Result};
 use data::Item;
 
 pub extern crate anyhow;
+pub extern crate tera;
 pub use actix_web;
 
 pub mod data;
