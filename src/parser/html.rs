@@ -7,7 +7,7 @@ use pathdiff::diff_paths;
 use anyhow::Result;
 use reqwest::Client;
 
-use crate::{data::{Item, State, Value}, error::FsError};
+use crate::{data::{Item, State}, error::FsError};
 
 use super::ParserProcedure;
 

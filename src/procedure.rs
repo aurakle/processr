@@ -4,13 +4,13 @@ use std::{env, path::PathBuf};
 
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
+use tera::Value;
 use time::macros::format_description;
 use time::{format_description, Date};
-use crate::data::{State, Value};
+use crate::data::{State};
 use crate::error::FsError;
-use crate::parser::{template::TemplateParser, ParserProcedure};
+use crate::parser::ParserProcedure;
 
-use crate::selector;
 use crate::Item;
 
 #[async_trait(?Send)]
@@ -50,17 +50,10 @@ pub trait SingleProcedure: Sized + Clone {
         }
     }
 
-    fn apply<T: SingleProcedure>(self, template: T) -> ApplyTemplate<Self, T> {
+    fn apply(self, template: &str) -> ApplyTemplate<Self> {
         ApplyTemplate {
             prior: self,
-            template,
-        }
-    }
-
-    fn load_and_apply<S: Into<String>>(self, path: S) -> LoadAndApplyTemplate<Self> {
-        LoadAndApplyTemplate {
-            prior: self,
-            path: path.into(),
+            template: template.to_owned(),
         }
     }
 
@@ -102,7 +95,7 @@ pub trait MultiProcedure<P: SingleProcedure>: Sized + Clone {
            result.push(item.into_meta()?);
         }
 
-        Ok(Value::from(result))
+        Ok(Value::Array(result))
     }
 
     fn chained<O, F>(self, func: F) -> Chain<P, Self, O, F>
@@ -225,40 +218,23 @@ impl<P: SingleProcedure, PARSER: ParserProcedure> SingleProcedure for Parse<P, P
 }
 
 #[derive(Clone)]
-pub struct ApplyTemplate<P: SingleProcedure, T: SingleProcedure> {
+pub struct ApplyTemplate<P: SingleProcedure> {
     prior: P,
-    template: T,
+    template: String,
 }
 
 #[async_trait(?Send)]
-impl<P: SingleProcedure, T: SingleProcedure> SingleProcedure for ApplyTemplate<P, T> {
+impl<P: SingleProcedure> SingleProcedure for ApplyTemplate<P> {
     async fn eval(&self, state: &mut State) -> Result<Item> {
         let item = self.prior.eval(state).await?;
-        let template = self.template.eval(state).await?;
-        let mut properties = template.properties.clone();
-        properties.extend(item.properties_with_url_and_body()?);
+        let ctx = tera::Context::from_serialize(item.properties_with_url_and_body()?)?;
+        let text = state.tera.render(&self.template, &ctx)?;
 
-        TemplateParser::default()
-            .process(state, &Item {
-                path: item.path.clone(),
-                bytes: template.bytes.clone(),
-                properties,
-            })
-            .await
-            .context(format!("While applying template {}", template.path.display()))
-    }
-}
-
-#[derive(Clone)]
-pub struct LoadAndApplyTemplate<P: SingleProcedure> {
-    prior: P,
-    path: String,
-}
-
-#[async_trait(?Send)]
-impl<P: SingleProcedure> SingleProcedure for LoadAndApplyTemplate<P> {
-    async fn eval(&self, state: &mut State) -> Result<Item> {
-        self.prior.clone().apply(selector::exact(&self.path).context(format!("While loading template {}", self.path))?).eval(state).await
+        Ok(Item {
+            path: item.path.clone(),
+            bytes: text.as_bytes().to_vec(),
+            properties: item.properties,
+        })
     }
 }
 

@@ -3,7 +3,7 @@ use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use lightningcss::{printer::PrinterOptions, stylesheet::{MinifyOptions, ParserOptions, StyleSheet}, targets::Targets};
 
-use crate::data::{Item, State, Value};
+use crate::data::{Item, State};
 
 use super::ParserProcedure;
 

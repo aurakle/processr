@@ -4,10 +4,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use chumsky::{prelude::*, text::newline};
 
-use crate::data::{Item, State, Value};
+use crate::data::{Item, State};
 
 pub mod markdown;
-pub mod template;
 pub mod image;
 pub mod html;
 pub mod css;

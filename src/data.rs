@@ -4,6 +4,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde::Deserialize;
 use sha_rs::{Sha, Sha256, Sha512};
+use tera::{Tera, Value};
 
 use crate::{error::FsError, prelude::SingleProcedure};
 
@@ -12,14 +13,16 @@ static SOURCES: &str = "sources.json";
 #[derive(Debug)]
 pub struct State {
     pub root: PathBuf,
+    pub tera: Tera,
     pub cache: PathBuf,
     pub cached_resources: HashMap<String, String>,
 }
 
 impl State {
-    pub fn new(root: &str) -> Result<Self> {
+    pub fn new(root: &str, templates: &str) -> Result<Self> {
         let pwd = env::current_dir()?;
         let root = pwd.join(root);
+        let tera = Tera::new(&format!("{}/**/*", templates))?;
         let cache = root.join(".cache");
         let cached_resources = Self::load_cc(&cache).unwrap_or(HashMap::new());
 
@@ -27,6 +30,7 @@ impl State {
 
         Ok(Self {
             root,
+            tera,
             cache,
             cached_resources,
         })
@@ -103,14 +107,19 @@ impl Item {
     pub fn properties_with_url_and_body(&self) -> Result<HashMap<String, Value>> {
         let mut props = self.properties.clone();
 
-        props.insert(format!("url"), Value::from(format!("/{}", self.path.as_os_str().to_str().ok_or(anyhow!("File path {} is not valid UTF-8", self.path.display()))?)));
-        props.insert(format!("body"), Value::from(String::from_utf8(self.bytes.clone())?));
+        props.insert(format!("url"), Value::String(format!("/{}", self.path.as_os_str().to_str().ok_or(anyhow!("File path {} is not valid UTF-8", self.path.display()))?)));
+        props.insert(format!("body"), Value::String(String::from_utf8(self.bytes.clone())?));
 
         Ok(props)
     }
 
     pub fn into_meta(&self) -> Result<Value> {
-        self.properties_with_url_and_body().map(|props| Value::from(props))
+        self.properties_with_url_and_body().map(|props| Value::Object({
+            let mut map = tera::Map::new();
+            map.extend(props);
+
+            map
+        }))
     }
 
     pub fn insert_into_cache(&mut self, state: &mut State, link: String, bytes: Vec<u8>, extension: Option<String>) -> Result<String> {
@@ -136,78 +145,5 @@ impl Item {
 impl SingleProcedure for Item {
     async fn eval(&self, state: &mut State) -> Result<Item> {
         Ok(self.clone())
-    }
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(untagged)]
-pub enum Value {
-    Map(HashMap<String, Value>),
-    List(Vec<Value>),
-    Text(String),
-}
-
-impl Value {
-    //TODO: add support for maps
-    pub fn as_string(&self) -> Option<String> {
-        match self {
-            Value::Map(map) => None,
-            Value::List(items) => Some(items
-                .iter()
-                .flat_map(|m| m.as_string())
-                .collect::<Vec<_>>()
-                .join(", ")),
-            Value::Text(s) => Some(s.clone()),
-        }
-    }
-
-    pub fn as_list(&self) -> Vec<Value> {
-        match self {
-            Value::Map(map) => vec![Value::Map(map.clone())],
-            Value::List(items) => items.clone(),
-            Value::Text(s) => vec![Value::Text(s.clone())],
-        }
-    }
-
-    pub fn as_map(&self) -> HashMap<String, Value> {
-        match self {
-            Value::Map(map) => map.clone(),
-            Value::List(items) => {
-                let mut map = HashMap::new();
-                map.insert(format!("i"), Value::List(items.clone()));
-
-                map
-            },
-            Value::Text(s) => {
-                let mut map = HashMap::new();
-                map.insert(format!("i"), Value::Text(s.clone()));
-
-                map
-            },
-        }
-    }
-}
-
-impl From<HashMap<String, Value>> for Value {
-    fn from(value: HashMap<String, Value>) -> Self {
-        Self::Map(value)
-    }
-}
-
-impl From<Vec<Value>> for Value {
-    fn from(value: Vec<Value>) -> Self {
-        Self::List(value)
-    }
-}
-
-impl From<String> for Value {
-    fn from(value: String) -> Self {
-        Self::Text(value)
-    }
-}
-
-impl From<&str> for Value {
-    fn from(value: &str) -> Self {
-        Self::Text(value.to_owned())
     }
 }

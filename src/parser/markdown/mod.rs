@@ -5,8 +5,9 @@ use async_trait::async_trait;
 use chumsky::{prelude::*, text::{ident, newline}};
 use extension::{MarkdownExtension, MarkdownExtensionList};
 use fronma::parser::parse;
+use tera::Value;
 
-use crate::data::{Item, State, Value};
+use crate::data::{Item, State};
 
 use super::{line_terminator, ParserProcedure};
 
