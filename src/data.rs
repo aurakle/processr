@@ -22,11 +22,12 @@ impl State {
     pub fn new(root: &str, templates: &str) -> Result<Self> {
         let pwd = env::current_dir()?;
         let root = pwd.join(root);
-        let tera = Tera::new(&format!("{}/**/*", templates))?;
+        let mut tera = Tera::new(&format!("{}/**/*", templates))?;
         let cache = root.join(".cache");
         let cached_resources = Self::load_cc(&cache).unwrap_or(HashMap::new());
 
         fs::create_dir_all(&cache)?;
+        tera.autoescape_on(vec![]);
 
         Ok(Self {
             root,
