@@ -256,11 +256,11 @@ impl<P: SingleProcedure> SingleProcedure for LoadDate<P> {
         let date = Date::parse(date_raw.as_str(), parse_format)?;
 
         let mut properties = item.properties.clone();
-        properties.insert("dateRaw".to_owned(), Value::from(date_raw));
-        properties.insert("date".to_owned(), Value::from(date.format(self.format)?));
-        properties.insert("dateYear".to_owned(), Value::from(format!("{}", v[0])));
-        properties.insert("dateMonth".to_owned(), Value::from(format!("{}", v[1])));
-        properties.insert("dateDay".to_owned(), Value::from(format!("{}", v[2])));
+        properties.insert("dateRaw".to_owned(), Value::String(date_raw));
+        properties.insert("date".to_owned(), Value::String(date.format(self.format)?));
+        properties.insert("dateYear".to_owned(), Value::String(format!("{}", v[0])));
+        properties.insert("dateMonth".to_owned(), Value::String(format!("{}", v[1])));
+        properties.insert("dateDay".to_owned(), Value::String(format!("{}", v[2])));
 
         Ok(Item {
             properties,
