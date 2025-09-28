@@ -94,8 +94,8 @@ pub fn clean(path: &str) -> Result<()> {
     let pwd = env::current_dir()?;
     let path = pwd.join(path);
 
-    if fs::exists(path)? {
-        fs::remove_dir_all(path)?;
+    if fs::exists(&path)? {
+        fs::remove_dir_all(&path)?;
     }
 
     Ok(())
