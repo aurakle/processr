@@ -1,4 +1,5 @@
 pub use crate::processr;
+pub use crate::rules;
 pub use crate::create;
 pub use crate::selector::{exact, regex, wild};
 pub use crate::procedure::{SingleProcedure, MultiProcedure};
