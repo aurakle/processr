@@ -86,9 +86,8 @@ macro_rules! processr {
 #[macro_export]
 macro_rules! rules {
     ($state:ident { $($names:ident $rules:expr)+ }) => {
-        {
-            $(let $names = $rules; $names.write(&mut $state).await?;)+
-        }
+        $(let $names = $rules;
+        $names.write(&mut $state).await?;)+
     };
 }
 
