@@ -48,6 +48,10 @@ impl State {
         Ok(())
     }
 
+    pub fn property<S: Into<String>>(&mut self, key: S, value: Value) {
+        self.cached_data.insert(key.into(), value);
+    }
+
     fn save_json<P: AsRef<Path>, S: Serialize>(path: P, value: S) -> Result<()> {
         let text = serde_json::to_string(&value)?;
         fs::write(path, text.as_bytes())?;
@@ -60,10 +64,6 @@ impl State {
         let res = serde_json::from_reader(file)?;
 
         Ok(res)
-    }
-
-    fn property<S: Into<String>>(&mut self, key: S, value: Value) {
-        self.cached_data.insert(key.into(), value);
     }
 }
 
