@@ -1,13 +1,14 @@
-use std::{collections::HashMap, env, fs, path::{Path, PathBuf}};
+use std::{collections::HashMap, env, fs::{self, File}, path::{Path, PathBuf}};
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sha_rs::{Sha, Sha256, Sha512};
 use tera::{Tera, Value};
 
 use crate::{error::FsError, prelude::SingleProcedure};
 
+static DATA: &str = "data.json";
 static SOURCES: &str = "sources.json";
 
 #[derive(Debug)]
@@ -15,7 +16,8 @@ pub struct State {
     pub root: PathBuf,
     pub tera: Tera,
     pub cache: PathBuf,
-    pub cached_resources: HashMap<String, String>,
+    pub cached_data: HashMap<String, Value>,
+    pub cached_sources: HashMap<String, String>,
 }
 
 impl State {
@@ -24,28 +26,38 @@ impl State {
         let root = pwd.join(root);
         let mut tera = Tera::new(&format!("{}/**/*", templates))?;
         let cache = root.join(".cache");
-        let cached_resources = Self::load_cc(&cache).unwrap_or(HashMap::new());
+        let cached_data = Self::load_json(cache.join(DATA)).unwrap_or(HashMap::new());
+        let cached_resources = Self::load_json(cache.join(SOURCES)).unwrap_or(HashMap::new());
 
         fs::create_dir_all(&cache)?;
-        tera.autoescape_on(vec![]);
+        tera.autoescape_on(Vec::new());
 
         Ok(Self {
             root,
             tera,
             cache,
-            cached_resources,
+            cached_data,
+            cached_sources: cached_resources,
         })
     }
 
     pub fn save(&mut self) -> Result<()> {
-        fs::write(self.cache.join(SOURCES), serde_json::to_string(&self.cached_resources)?.as_bytes())?;
+        Self::save_json(self.cache.join(DATA), &self.cached_data)?;
+        Self::save_json(self.cache.join(SOURCES), &self.cached_sources)?;
 
         Ok(())
     }
 
-    fn load_cc(cache: &Path) -> Result<HashMap<String, String>> {
-        let sources = fs::read_to_string(cache.join(SOURCES))?;
-        let res = serde_json::from_str(&sources)?;
+    fn save_json<P: AsRef<Path>, S: Serialize>(path: P, value: S) -> Result<()> {
+        let text = serde_json::to_string(&value)?;
+        fs::write(path, text.as_bytes())?;
+
+        Ok(())
+    }
+
+    fn load_json<P: AsRef<Path>, D: for<'a> Deserialize<'a>>(path: P) -> Result<D> {
+        let file = File::open(path)?;
+        let res = serde_json::from_reader(file)?;
 
         Ok(res)
     }
@@ -136,7 +148,7 @@ impl Item {
         }
 
         let cache_link = format!("/.cache/{}", filename);
-        state.cached_resources.insert(link, cache_link.clone());
+        state.cached_sources.insert(link, cache_link.clone());
 
         Ok(cache_link)
     }

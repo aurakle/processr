@@ -38,7 +38,7 @@ impl HtmlParser {
             let new_link = {
                 if link.starts_with("http://") || link.starts_with("https://") {
                     if self.cache_linked_resources && target.filter("*:not(a):not(link)").exists() {
-                        let file = match state.cached_resources.get(&link) {
+                        let file = match state.cached_sources.get(&link) {
                             Some(p) => p.clone(),
                             None => {
                                 println!("Caching resource at {}", link.clone());
@@ -70,7 +70,7 @@ impl HtmlParser {
                                 } else {
                                     println!("Caching failed");
                                     println!("Falling back to external link");
-                                    state.cached_resources.insert(link.clone(), link.clone());
+                                    state.cached_sources.insert(link.clone(), link.clone());
 
                                     link
                                 }
