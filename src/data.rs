@@ -61,6 +61,10 @@ impl State {
 
         Ok(res)
     }
+
+    fn property<S: Into<String>>(&mut self, key: S, value: Value) {
+        self.cached_data.insert(key.into(), value);
+    }
 }
 
 #[derive(Debug, Clone)]

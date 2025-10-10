@@ -227,7 +227,9 @@ pub struct ApplyTemplate<P: SingleProcedure> {
 impl<P: SingleProcedure> SingleProcedure for ApplyTemplate<P> {
     async fn eval(&self, state: &mut State) -> Result<Item> {
         let item = self.prior.eval(state).await?;
-        let ctx = tera::Context::from_serialize(item.properties_with_url_and_body()?)?;
+        let mut properties = state.cached_data.clone();
+        properties.extend(item.properties_with_url_and_body()?);
+        let ctx = tera::Context::from_serialize(properties)?;
         let text = state.tera.render(&self.template, &ctx)?;
 
         Ok(Item {
