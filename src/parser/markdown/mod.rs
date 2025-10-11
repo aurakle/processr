@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
 use chumsky::{prelude::*, text::{ident, newline}};
 use extension::{MarkdownExtension, MarkdownExtensionList};
@@ -40,21 +40,22 @@ impl ParserProcedure for MarkdownParser {
 
     async fn process(&self, state: &mut State, item: &Item) -> Result<Item> {
         let text = String::from_utf8(item.bytes.clone())?;
-        let data = parse::<HashMap<String, Value>>(&text).map_err(|e| {
-            match e {
-                fronma::error::Error::MissingBeginningLine => anyhow!("Markdown document is missing frontmatter"),
-                fronma::error::Error::MissingEndingLine => anyhow!("Frontmatter is missing closing triple dash"),
-                fronma::error::Error::SerdeYaml(e) => anyhow!("Failed to parse YAML frontmatter: {}", e),
-            }
-        })?;
+        let (headers, body) = match parse::<HashMap<String, Value>>(&text) {
+            Ok(val) => (val.headers, val.body),
+            Err(e) => match e {
+                fronma::error::Error::MissingBeginningLine => (HashMap::new(), text.as_str()),
+                fronma::error::Error::MissingEndingLine => bail!("Frontmatter is missing closing triple dash"),
+                fronma::error::Error::SerdeYaml(e) => bail!("Failed to parse YAML frontmatter: {}", e),
+            },
+        };
 
-        let body = data.body.to_owned().trim().to_owned();
+        let body = body.to_owned().trim().to_owned();
         let res = make_parser(&self.extensions).parse(&body).into_result().map_err(|_e| anyhow!("Failed to parse markdown"))?;
         // markdown is stupid and I'm lazy, so have a band-aid fix
         let res = format!("<p>{}</p>", res).replace("<p></p>", "");
 
         let mut properties = item.properties.clone();
-        properties.extend(data.headers);
+        properties.extend(headers);
 
         Ok(Item {
             bytes: res.as_bytes().to_vec(),
