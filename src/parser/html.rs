@@ -154,7 +154,11 @@ impl ParserProcedure for HtmlParser {
         }
 
         document.normalize();
-        item.bytes = document.html().to_string().as_bytes().to_vec();
+
+        let cfg = minify_html::Cfg::default();
+        let text = document.html().to_string();
+        item.bytes = minify_html::minify(text.as_bytes(), &cfg);
+
         Ok(item)
     }
 }

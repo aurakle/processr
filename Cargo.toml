@@ -16,6 +16,7 @@ html-escape = "0.2.13"
 image = "0.25.6"
 lightningcss = { version = "1.0.0-alpha.67" }
 mime_guess = "2.0.5"
+minify-html = "0.16.4"
 pathdiff = "0.2.3"
 rand = "0.9.1"
 regex = "1.11.1"
