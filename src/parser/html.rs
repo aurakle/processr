@@ -43,12 +43,26 @@ impl HtmlParser {
                             None => {
                                 println!("Caching resource at {}", link.clone());
 
-                                let response = http_client.get(link.clone()).send().await?;
-                                let status = response.status();
+                                let response = match http_client.get(link.clone()).send().await {
+                                    Ok(response) => {
+                                        let status = response.status();
 
-                                println!("Received HTTP status {}{}", status.as_u16(), status.canonical_reason().map(|s| format!(": {}", s)).unwrap_or(String::new()));
+                                        println!("Received HTTP status {}{}", status.as_u16(), status.canonical_reason().map(|s| format!(": {}", s)).unwrap_or(String::new()));
 
-                                if status.is_success() {
+                                        if status.is_success() {
+                                            Some(response)
+                                        } else {
+                                            None
+                                        }
+                                    },
+                                    Err(e) => {
+                                        println!("No response was received. Error: {}", e);
+
+                                        None
+                                    },
+                                };
+
+                                if let Some(response) = response {
                                     let extension = response
                                         .headers()
                                         .get("Content-Type")
