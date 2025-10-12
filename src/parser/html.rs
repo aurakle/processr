@@ -56,7 +56,7 @@ impl HtmlParser {
                                         }
                                     },
                                     Err(e) => {
-                                        println!("No response was received. Error: {:#}", e);
+                                        println!("No response was received. Error: {:#?}", e);
 
                                         None
                                     },
