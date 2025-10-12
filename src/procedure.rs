@@ -255,7 +255,7 @@ impl<P: SingleProcedure> SingleProcedure for LoadDate<P> {
         let date = Date::parse(date_raw.as_str(), parse_format)?;
 
         let mut properties = item.properties.clone();
-        properties.insert("date".to_owned(), serde_json::to_value(date.midnight().as_utc())?);
+        properties.insert("date".to_owned(), Value::from(date.midnight().as_utc().unix_timestamp()));
 
         Ok(Item {
             properties,
