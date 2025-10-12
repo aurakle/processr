@@ -7,7 +7,7 @@ use pathdiff::diff_paths;
 use anyhow::Result;
 use reqwest::Client;
 
-use crate::{data::{Item, State}, error::FsError};
+use crate::{data::{Item, State}, error::FsError, USER_AGENT};
 
 use super::ParserProcedure;
 
@@ -150,7 +150,7 @@ impl ParserProcedure for HtmlParser {
     async fn process(&self, state: &mut State, item: &Item) -> Result<Item> {
         let mut item = item.clone();
         let client = reqwest::Client::builder()
-            .user_agent(concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")))
+            .user_agent(USER_AGENT)
             .build()?;
         let mut document = Document::from(String::from_utf8(item.bytes.clone())?);
         document.normalize();

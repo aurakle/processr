@@ -15,6 +15,8 @@ pub mod parser;
 pub mod procedure;
 pub mod selector;
 
+pub static USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
+
 #[derive(Debug, clap::Parser)]
 #[command(name = "processr")]
 #[command(about = "Static site generator configured through a Rust macro DSL", long_about = None)]
@@ -72,6 +74,7 @@ macro_rules! processr {
                 $crate::clean($out)?
             }
 
+            println!("User-Agent: {}", $crate::USER_AGENT);
             let mut $state = $crate::data::State::new($out, $templates)?;
 
             $build
