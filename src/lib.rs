@@ -15,7 +15,7 @@ pub mod parser;
 pub mod procedure;
 pub mod selector;
 
-pub static USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
+pub static USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"), " - ", "https://github.com/aurakle/processr");
 
 #[derive(Debug, clap::Parser)]
 #[command(name = "processr")]

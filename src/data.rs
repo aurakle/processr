@@ -26,7 +26,7 @@ impl State {
         let root = pwd.join(root);
         let mut tera = Tera::new(&format!("{}/**/*", templates))?;
         let cache = root.join(".cache");
-        let cached_data = Self::load_json(cache.join(DATA)).unwrap_or(HashMap::new());
+        // let cached_data = Self::load_json(cache.join(DATA)).unwrap_or(HashMap::new());
         let cached_resources = Self::load_json(cache.join(SOURCES)).unwrap_or(HashMap::new());
 
         fs::create_dir_all(&cache)?;
@@ -36,13 +36,13 @@ impl State {
             root,
             tera,
             cache,
-            cached_data,
+            cached_data: HashMap::new(),
             cached_sources: cached_resources,
         })
     }
 
     pub fn save(&mut self) -> Result<()> {
-        Self::save_json(self.cache.join(DATA), &self.cached_data)?;
+        // Self::save_json(self.cache.join(DATA), &self.cached_data)?;
         Self::save_json(self.cache.join(SOURCES), &self.cached_sources)?;
 
         Ok(())
