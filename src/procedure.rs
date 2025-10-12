@@ -57,11 +57,9 @@ pub trait SingleProcedure: Sized + Clone {
         }
     }
 
-    /// https://time-rs.github.io/book/api/format-description.html
-    fn load_date(self, format: &'static [time::format_description::BorrowedFormatItem<'static>]) -> LoadDate<Self> {
+    fn load_date(self) -> LoadDate<Self> {
         LoadDate {
             prior: self,
-            format
         }
     }
 
@@ -243,7 +241,6 @@ impl<P: SingleProcedure> SingleProcedure for ApplyTemplate<P> {
 #[derive(Clone)]
 pub struct LoadDate<P: SingleProcedure> {
     prior: P,
-    format: &'static [time::format_description::BorrowedFormatItem<'static>],
 }
 
 #[async_trait(?Send)]
@@ -258,11 +255,7 @@ impl<P: SingleProcedure> SingleProcedure for LoadDate<P> {
         let date = Date::parse(date_raw.as_str(), parse_format)?;
 
         let mut properties = item.properties.clone();
-        properties.insert("dateRaw".to_owned(), Value::String(date_raw));
-        properties.insert("date".to_owned(), Value::String(date.format(self.format)?));
-        properties.insert("dateYear".to_owned(), Value::String(format!("{}", v[0])));
-        properties.insert("dateMonth".to_owned(), Value::String(format!("{}", v[1])));
-        properties.insert("dateDay".to_owned(), Value::String(format!("{}", v[2])));
+        properties.insert("date".to_owned(), serde_json::to_value(date.midnight().as_utc())?);
 
         Ok(Item {
             properties,
